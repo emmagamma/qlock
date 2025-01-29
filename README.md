@@ -1,15 +1,27 @@
 # qlock
-> (pronounced 'clock')
+**(pronounced 'clock', because I'm annoying like that)**
 
-a CLI tool in rust for encrypting data locally with XChaCha20Poly1305.
+a CLI tool in rust for encrypting data locally with XChaCha20Poly1305, and argon2 is used for hashing.
 
-keys are also encrypted using a separate nonce, and argon2 is used for hashing.
+keys are also encrypted using a separate nonce and a user-provided password.
 
-### getting started/install
+> this tool does not store your passwords locally. if you forget them, you wont be able to decrypt your `.qlock` files.
 
+### Getting Started/Install
+
+1. clone the repo and cd into it:
+
+```bash
+git clone git@github.com:emmagamma/qlock.git && cd qlock/
+```
+
+2. build the binary and copy it to your bin so you can run it:
+
+```bash
 cargo build --release && cp target/release/qlock /usr/local/bin/qlock
+```
 
-### usage
+### Usage
 
 ```bash
 # encrypt a file
