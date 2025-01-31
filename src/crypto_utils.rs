@@ -10,6 +10,7 @@ use rpassword;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
 
 use crate::file_utils::FileUtils;
 use crate::metadata_manager::{EncryptedData, MetadataManager};
@@ -22,8 +23,12 @@ pub struct CryptoUtils {
 
 impl CryptoUtils {
     pub fn new() -> Self {
+        let num_threads: u32 = thread::available_parallelism()
+            .map(|n| n.get()).unwrap_or(1).try_into().unwrap();
+
         Self {
-            argon_params: Params::new(42_699u32, 2u32, 8u32, Some(32)).unwrap(),
+            // base p_cost on number of threads on the system
+            argon_params: Params::new(42_699u32, 2u32, num_threads, Some(32)).unwrap(),
         }
     }
 
