@@ -30,8 +30,11 @@ qlock -e <file path>
 # decrypt the encrypted file
 qlock -d <path to .qlock file>
 
-# list out the saved hashes and associated input & output files
+# list out each saved encrypted key, along with some metadata
 qlock ls
+
+# remove all the saved metadata for a given key, by name
+qlock rm <key-name>
 
 # specify an optional output to name the encrypted file, note that `.qlock` will be appended to it automatically.
 qlock -e <path to file you want to encrypt> -o <output file name>
