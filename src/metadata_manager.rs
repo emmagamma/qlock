@@ -2,8 +2,14 @@ use std::{fs, io, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+use terminal_size::{terminal_size, Width};
+use textwrap;
+
+use crate::qlock_errors::QlockError;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EncryptedData {
+    pub name: String,
     pub hash: Vec<u8>,
     pub key: Vec<u8>,
     pub nonce_a: Vec<u8>,
@@ -31,9 +37,13 @@ impl MetadataManager {
         }
 
         let mut saved_data = self.read()?;
-        saved_data.data.push(additional_metadata);
+        saved_data.data.push(additional_metadata.clone());
         self.save_metadata(&saved_data)?;
-        println!("saved key metadata to: ./{}", Self::METADATA_FILE);
+        println!(
+            "saved metadata for {} to: ./{}",
+            additional_metadata.name,
+            Self::METADATA_FILE
+        );
         Ok(())
     }
 
@@ -56,15 +66,89 @@ impl MetadataManager {
             return;
         }
 
+        let width = if let Some((Width(w), _)) = terminal_size() {
+            w as usize
+        } else {
+            80 // Fallback to a default width
+        };
+
         match self.read() {
             Ok(saved_data) => {
-                for datum in saved_data.data {
-                    println!("hash: {:?}", datum.hash);
-                    println!("  filename: {}", datum.filename);
-                    println!("  encrypted output: {}", datum.output_filename);
+                if saved_data.data.is_empty() {
+                    println!("No encrypted keys were found in {}.", Self::METADATA_FILE);
+                    return;
+                }
+                for (index, datum) in saved_data.data.iter().enumerate() {
+                    println!("{}. name: {}", (index + 1), datum.name);
+                    println!("{:indent$}input file: {}", "", datum.filename, indent = 2);
+                    println!(
+                        "{:indent$}output file: {}",
+                        "",
+                        datum.output_filename,
+                        indent = 2
+                    );
+                    pretty_print_vec("encrypted key: ", &datum.key, 2, width);
+                    pretty_print_vec("hash of encrypted file: ", &datum.hash, 2, width);
+                    println!("");
                 }
             }
             Err(e) => println!("Error reading metadata: {}", e),
         }
     }
+
+    pub fn remove_metadata(&self, name: &str) -> Result<bool, QlockError> {
+        let mut saved_data = self.read().map_err(QlockError::IoError)?;
+        let index = saved_data
+            .data
+            .iter()
+            .position(|d| d.name == name)
+            .ok_or(QlockError::MetadataNotFound(name.to_string()))?;
+
+        println!(
+            "are you sure you want to remove metadata for {}? (y/n)",
+            name
+        );
+
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .map_err(QlockError::IoError)?;
+
+        if input.trim() != "y" {
+            println!("metadata for {} is still saved", name);
+            return Ok(false);
+        }
+
+        saved_data.data.remove(index);
+
+        self.save_metadata(&saved_data)
+            .map_err(QlockError::IoError)?;
+
+        println!(
+            "removed metadata for {} from: ./{}",
+            name,
+            Self::METADATA_FILE
+        );
+
+        Ok(true)
+    }
+}
+
+fn pretty_print_vec(preceeding: &str, vec: &[u8], indent: usize, width: usize) {
+    let formatted = format!("{}{:?}", preceeding, vec); // Format the Vec<u8> using Debug trait
+
+    let indented = textwrap::fill(&formatted, width / 2)
+        .lines()
+        .enumerate()
+        .map(|(i, line)| {
+            if i == 0 {
+                line.to_string()
+            } else {
+                format!("{:indent$}{}", "", line, indent = indent + 2)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    println!("{:indent$}{}", "", indented, indent = indent);
 }

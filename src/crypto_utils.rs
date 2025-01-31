@@ -8,12 +8,13 @@ use chacha20poly1305::{
 use rand::RngCore;
 use rpassword;
 use std::fs;
-use std::io::{self};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::file_utils::FileUtils;
 use crate::metadata_manager::{EncryptedData, MetadataManager};
 use crate::qlock_errors::QlockError;
+use crate::word_lists::generate_random_name;
 
 pub struct CryptoUtils {
     argon_params: argon2::Params,
@@ -68,14 +69,19 @@ impl Encryptor {
         let password = self.get_encryption_password_with("Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: ")?;
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
 
+        println!("Generating a random key and encrypting your data...");
         let (ciphertext, nonce_a, og_key) = self.encrypt_contents(&contents)?;
         let output_path = self.determine_output_path(file_path, output_path);
 
+        println!("Generating a password-derived key to encrypt the first key with...");
         let (encrypted_key, nonce_b, salt) = self.encrypt_key(&password, &og_key.to_vec())?;
         let hash_salt = self.crypto_utils.generate_salt();
         let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &hash_salt)?;
 
+        let key_name = self.get_key_name()?;
+
         let metadata = EncryptedData {
+            name: key_name,
             key: encrypted_key,
             hash: hash_bytes.to_vec(),
             nonce_a: nonce_a.to_vec(),
@@ -91,6 +97,25 @@ impl Encryptor {
             .map_err(QlockError::IoError)?;
         FileUtils::write_with_confirmation(&output_path, &ciphertext, "encrypted")
             .map_err(QlockError::IoError)
+    }
+
+    fn get_key_name(&self) -> Result<String, QlockError> {
+        print!("Enter a name for your encrypted key (leave blank to auto-generate a name):");
+        let _ = io::stdout().flush();
+
+        let input = io::stdin();
+        let mut key_name = String::new();
+        input
+            .read_line(&mut key_name)
+            .map_err(QlockError::IoError)?;
+
+        if key_name.trim().is_empty() {
+            let name = generate_random_name();
+            println!("Auto-generated name: {}", name);
+            Ok(name)
+        } else {
+            Ok(key_name.trim().to_string())
+        }
     }
 
     pub fn get_encryption_password_with(&self, prompt: &str) -> Result<String, QlockError> {

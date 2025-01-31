@@ -6,6 +6,7 @@ pub enum QlockError {
     EncryptionError(String),
     DecryptionError(String),
     KeyDerivationError(String),
+    MetadataNotFound(String),
 }
 
 impl std::fmt::Display for QlockError {
@@ -15,6 +16,7 @@ impl std::fmt::Display for QlockError {
             QlockError::EncryptionError(msg) => write!(f, "Encryption error: {}", msg),
             QlockError::DecryptionError(msg) => write!(f, "Decryption error: {}", msg),
             QlockError::KeyDerivationError(msg) => write!(f, "Key derivation error: {}", msg),
+            QlockError::MetadataNotFound(msg) => write!(f, "Metadata not found: {}", msg),
         }
     }
 }

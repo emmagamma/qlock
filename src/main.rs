@@ -15,7 +15,7 @@ struct Qlock {
     action: Option<ActionArgs>,
 }
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 struct ActionArgs {
     /// The path to the file to encrypt or decrypt
     #[arg(value_parser = clap::value_parser!(PathBuf))]
@@ -41,8 +41,15 @@ struct ActionArgs {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// list the hashes, input filename, and output filename, for each file you've already encrypted
+    /// show a list of each encrypted key you have saved in `qlock_metadata.json`
     Ls,
+    /// remove a saved encrypted key by passing it's name
+    Rm {
+        /// the name of the saved encrypted key to remove
+        #[arg(value_parser = clap::value_parser!(String))]
+        #[arg(required = false)]
+        name: Option<String>,
+    },
 }
 
 fn main() -> Result<(), QlockError> {
@@ -51,6 +58,16 @@ fn main() -> Result<(), QlockError> {
     match cli.command {
         Some(Commands::Ls) => {
             MetadataManager.list();
+            return Ok(());
+        }
+        Some(Commands::Rm { name }) => {
+            if !name.is_none() {
+                if let Err(e) = MetadataManager.remove_metadata(&name.unwrap()) {
+                    eprintln!("Error removing metadata: {}", e);
+                }
+            } else {
+                eprintln!("Please specify the name of an encrypted key to remove");
+            }
             return Ok(());
         }
         None => {}
