@@ -65,13 +65,13 @@ impl Encryptor {
         file_path: &PathBuf,
         output_path: Option<String>,
     ) -> Result<(), QlockError> {
-        let password = self.get_encryption_password()?;
+        let password = self.get_encryption_password_with("Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: ")?;
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
 
         let (ciphertext, nonce_a, og_key) = self.encrypt_contents(&contents)?;
         let output_path = self.determine_output_path(file_path, output_path);
 
-        let (encrypted_key, nonce_b, salt) = self.encrypt_key(&password, &og_key)?;
+        let (encrypted_key, nonce_b, salt) = self.encrypt_key(&password, &og_key.to_vec())?;
         let hash_salt = self.crypto_utils.generate_salt();
         let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &hash_salt)?;
 
@@ -93,10 +93,59 @@ impl Encryptor {
             .map_err(QlockError::IoError)
     }
 
-    pub fn get_encryption_password(&self) -> Result<String, QlockError> {
-        rpassword::prompt_password(
-            "Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: "
-        ).map_err(|e| QlockError::IoError(io::Error::new(io::ErrorKind::Other, e)))
+    pub fn get_encryption_password_with(&self, prompt: &str) -> Result<String, QlockError> {
+        let pass = rpassword::prompt_password(prompt).map_err(|e| QlockError::IoError(e))?;
+
+        if self.validate_password(&pass) {
+            Ok(pass)
+        } else {
+            self.get_encryption_password_with("Create a new password: ")
+        }
+    }
+
+    fn validate_password(&self, password: &str) -> bool {
+        let has_number_or_punctuation = password
+            .chars()
+            .any(|c| c.is_ascii_punctuation() || c.is_numeric());
+        let has_uppercase = password.chars().any(|c| c.is_uppercase());
+        let has_lowercase = password.chars().any(|c| c.is_lowercase());
+
+        if password.len() < 16 {
+            println!("Password was too short, it should be at least 16 characters long...");
+
+            if !has_uppercase || !has_lowercase {
+                println!("It should also contain a mix of upper and lower case letters");
+
+                if !has_number_or_punctuation {
+                    println!("and at least 1 number or special character");
+                }
+            } else if !has_number_or_punctuation {
+                println!("It should also contain at least 1 number or special character\n");
+            }
+
+            println!("Let's try again\n");
+
+            return false;
+        }
+
+        if !has_uppercase || !has_lowercase {
+            println!("Passwords should contain a mix of upper and lower case characters...\n");
+
+            if !has_number_or_punctuation {
+                println!("It was also missing at least 1 number or special character...\n");
+            }
+
+            println!("Let's try again\n");
+
+            return false;
+        }
+
+        if !has_number_or_punctuation {
+            println!("Password was missing at least 1 number or special character...\n\nLet's try again\n");
+            return false;
+        }
+
+        true
     }
 
     pub fn encrypt_contents(
@@ -114,7 +163,11 @@ impl Encryptor {
         Ok((ciphertext, nonce, key))
     }
 
-    pub fn determine_output_path(&self, file_path: &PathBuf, output_path: Option<String>) -> PathBuf {
+    pub fn determine_output_path(
+        &self,
+        file_path: &PathBuf,
+        output_path: Option<String>,
+    ) -> PathBuf {
         match output_path {
             Some(path) => PathBuf::from([path, ".qlock".to_string()].join("")),
             None => PathBuf::from(
