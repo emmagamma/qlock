@@ -47,7 +47,6 @@ enum Commands {
     Rm {
         /// the name of the saved encrypted key to remove
         #[arg(value_parser = clap::value_parser!(String))]
-        #[arg(required = false)]
         name: Option<String>,
     },
 }
