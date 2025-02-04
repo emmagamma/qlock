@@ -24,10 +24,12 @@ pub struct CryptoUtils {
 impl CryptoUtils {
     pub fn new() -> Self {
         let num_threads: u32 = thread::available_parallelism()
-            .map(|n| n.get()).unwrap_or(1).try_into().unwrap();
+            .map(|n| n.get())
+            .unwrap_or(1)
+            .try_into()
+            .unwrap();
 
         Self {
-            // base p_cost on number of threads on the system
             argon_params: Params::new(42_699u32, 2u32, num_threads, Some(32)).unwrap(),
         }
     }
@@ -38,20 +40,20 @@ impl CryptoUtils {
         salt
     }
 
-    pub fn derive_key(&self, password: &[u8], salt: &[u8]) -> Result<[u8; 32], QlockError> {
-        let mut derived_key = [0u8; 32];
-        Argon2::new(Argon2d, V0x13, self.argon_params.clone())
-            .hash_password_into(password, salt, &mut derived_key)
-            .map_err(|e| QlockError::KeyDerivationError(e.to_string()))?;
-        Ok(derived_key)
-    }
-
     pub fn generate_hash(&self, content: &[u8], salt: &[u8]) -> Result<[u8; 32], QlockError> {
         let mut hash = [0u8; 32];
         Argon2::new(Argon2d, V0x13, self.argon_params.clone())
             .hash_password_into(content, salt, &mut hash)
             .map_err(|e| QlockError::KeyDerivationError(e.to_string()))?;
         Ok(hash)
+    }
+
+    pub fn derive_key(&self, password: &[u8], salt: &[u8]) -> Result<[u8; 32], QlockError> {
+        let mut derived_key = [0u8; 32];
+        Argon2::new(Argon2d, V0x13, self.argon_params.clone())
+            .hash_password_into(password, salt, &mut derived_key)
+            .map_err(|e| QlockError::KeyDerivationError(e.to_string()))?;
+        Ok(derived_key)
     }
 }
 
@@ -126,56 +128,11 @@ impl Encryptor {
     pub fn get_encryption_password_with(&self, prompt: &str) -> Result<String, QlockError> {
         let pass = rpassword::prompt_password(prompt).map_err(|e| QlockError::IoError(e))?;
 
-        if self.validate_password(&pass) {
+        if validate_password(&pass) {
             Ok(pass)
         } else {
             self.get_encryption_password_with("Create a new password: ")
         }
-    }
-
-    fn validate_password(&self, password: &str) -> bool {
-        let has_number_or_punctuation = password
-            .chars()
-            .any(|c| c.is_ascii_punctuation() || c.is_numeric());
-        let has_uppercase = password.chars().any(|c| c.is_uppercase());
-        let has_lowercase = password.chars().any(|c| c.is_lowercase());
-
-        if password.len() < 16 {
-            println!("Password was too short, it should be at least 16 characters long...");
-
-            if !has_uppercase || !has_lowercase {
-                println!("It should also contain a mix of upper and lower case letters");
-
-                if !has_number_or_punctuation {
-                    println!("and at least 1 number or special character");
-                }
-            } else if !has_number_or_punctuation {
-                println!("It should also contain at least 1 number or special character\n");
-            }
-
-            println!("Let's try again\n");
-
-            return false;
-        }
-
-        if !has_uppercase || !has_lowercase {
-            println!("Passwords should contain a mix of upper and lower case characters...\n");
-
-            if !has_number_or_punctuation {
-                println!("It was also missing at least 1 number or special character...\n");
-            }
-
-            println!("Let's try again\n");
-
-            return false;
-        }
-
-        if !has_number_or_punctuation {
-            println!("Password was missing at least 1 number or special character...\n\nLet's try again\n");
-            return false;
-        }
-
-        true
     }
 
     pub fn encrypt_contents(
@@ -307,4 +264,51 @@ impl Decryptor {
             .decrypt(nonce_a, contents)
             .map_err(|e| QlockError::DecryptionError(e.to_string()))
     }
+}
+
+fn validate_password(password: &str) -> bool {
+    let has_number_or_punctuation = password
+        .chars()
+        .any(|c| c.is_ascii_punctuation() || c.is_numeric());
+    let has_uppercase = password.chars().any(|c| c.is_uppercase());
+    let has_lowercase = password.chars().any(|c| c.is_lowercase());
+
+    if password.len() < 16 {
+        println!("Password was too short, it should be at least 16 characters long...");
+
+        if !has_uppercase || !has_lowercase {
+            println!("It should also contain a mix of upper and lower case letters");
+
+            if !has_number_or_punctuation {
+                println!("and at least 1 number or special character");
+            }
+        } else if !has_number_or_punctuation {
+            println!("It should also contain at least 1 number or special character\n");
+        }
+
+        println!("Let's try again\n");
+
+        return false;
+    }
+
+    if !has_uppercase || !has_lowercase {
+        println!("Passwords should contain a mix of upper and lower case characters...\n");
+
+        if !has_number_or_punctuation {
+            println!("It was also missing at least 1 number or special character\n");
+        }
+
+        println!("Let's try again\n");
+
+        return false;
+    }
+
+    if !has_number_or_punctuation {
+        println!(
+            "Password was missing at least 1 number or special character...\n\nLet's try again\n"
+        );
+        return false;
+    }
+
+    true
 }

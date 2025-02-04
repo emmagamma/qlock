@@ -69,7 +69,7 @@ impl MetadataManager {
         let width = if let Some((Width(w), _)) = terminal_size() {
             w as usize
         } else {
-            80 // Fallback to a default width
+            80
         };
 
         match self.read() {
@@ -105,7 +105,7 @@ impl MetadataManager {
             .ok_or(QlockError::MetadataNotFound(name.to_string()))?;
 
         println!(
-            "are you sure you want to remove metadata for {}? (y/n)",
+            "are you sure you want to PERMANENTLY DELETE all metadata for {}? (y/n)",
             name
         );
 

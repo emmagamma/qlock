@@ -30,8 +30,8 @@ struct ActionArgs {
     #[arg(short = 'd', long = "decrypt", group = "action")]
     decrypt: bool,
 
-    /// The name of the output file, when encrypting we will append .qlock, but when decrypting
-    /// you can supply your own file extension. By default, if no output is specified, during
+    /// The name of the output file. when encrypting we will append .qlock, but when decrypting
+    /// you should supply your own file extension. By default, if no output is specified, during
     /// encryption we use the name of the input file and replace the extension with .qlock, and
     /// during decryption we use the saved name of the original file, if found in
     /// qlock_metadata.json where your keys are saved in an encrypted format
@@ -60,12 +60,13 @@ fn main() -> Result<(), QlockError> {
             return Ok(());
         }
         Some(Commands::Rm { name }) => {
-            if !name.is_none() {
+            if name.is_none() {
+                eprintln!("Please specify the name of an encrypted key to remove");
+                std::process::exit(1);
+            } else {
                 if let Err(e) = MetadataManager.remove_metadata(&name.unwrap()) {
                     eprintln!("Error removing metadata: {}", e);
                 }
-            } else {
-                eprintln!("Please specify the name of an encrypted key to remove");
             }
             return Ok(());
         }

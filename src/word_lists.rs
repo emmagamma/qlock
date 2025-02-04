@@ -39,8 +39,24 @@ pub fn generate_random_name() -> String {
         let mut digits = number.to_string().chars().collect::<Vec<char>>();
         for i in 0..digits.len() - 1 {
             if digits[i] == '8' && digits[i + 1] == '8' {
-                digits[i] = (rng.gen_range(0..10) + '0' as u8) as char;
-                digits[i + 1] = (rng.gen_range(0..10) + '0' as u8) as char;
+                let mut new_numb = rng.gen_range(0..9);
+                if new_numb >= 8 {
+                    new_numb += 1;
+                }
+
+                // use + 0 or + 1 to decide at random which digit to replace
+                let index_padding = rng.gen_range(0..2);
+                digits[i + index_padding] = char::from_digit(new_numb, 10).unwrap();
+
+                // randomly decide to update both or just one
+                let update_both = rng.gen_range(0..2);
+                if update_both == 1 {
+                    new_numb = rng.gen_range(0..9);
+                    if new_numb >= 8 {
+                        new_numb += 1;
+                    }
+                    digits[i + 1 - index_padding] = char::from_digit(new_numb, 10).unwrap();
+                }
             }
         }
         number = digits.iter().collect::<String>().parse().unwrap();
