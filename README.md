@@ -37,9 +37,10 @@ qlock ls
 qlock rm <key-name>
 
 # specify an optional output to name the encrypted file, note that `.qlock` will be appended to it automatically.
+# if no output name is provided, we use the original file name with `.qlock` instead of it's original extension.
 qlock -e <path to file you want to encrypt> -o <output file name>
 
 # specify an optional output to name the decrypted file, including the file extension to use.
-# by default, it will use the original file name saved from when the file was encrypted.
+# if no output name is provided, we use the original file name saved in `qlock_metadata.json` from when the file was encrypted.
 qlock -d <path to .qlock file> -o <output file name>
 ```
