@@ -1,11 +1,8 @@
 # qlock
-**(pronounced 'clock', because I'm annoying like that)**
 
-a CLI tool in rust for encrypting data locally with XChaCha20Poly1305, and argon2 is used for hashing.
+**(pronounced 'Queue Lock', or 'clock' if ur feelin spicy?)**
 
-keys are also encrypted using a separate nonce and a user-provided password.
-
-> this tool does not store your passwords locally. if you forget them, you wont be able to decrypt your `.qlock` files.
+a simple CLI tool written in rust for encrypting files locally with XChaCha20Poly1305, and using argon2 for hashing.
 
 ### Getting Started/Install
 
@@ -44,3 +41,31 @@ qlock -e <path to file you want to encrypt> -o <output file name>
 # if no output name is provided, we use the original file name saved in `qlock_metadata.json` from when the file was encrypted.
 qlock -d <path to .qlock file> -o <output file name>
 ```
+
+### Nerdy Details
+
+The way it works is by first generating a random key to encrypt the contents of your file,
+then we use a password you create to derive a second key which is used to encrypt the first key,
+we do not store the password-derived key, only an encrypted version of the first key.
+Metadata about each encrypted key is saved in a file called `qlock_metadata.json` in whichever directory you run this tool from,
+including a hash of the encrypted contents of the file, the encrypted version of the first key,
+two nonces, two salts, the input filename and output filename, and a user-provided or auto-generated name.
+
+> Since we don't store the password itself or anything based on it, forgetting your password(s)
+> will result in you no longer being able to decrypt your `.qlock` file(s). I recommend using a password manager.
+
+> Even if you remember your password, accidentally deleting your `qlock_metadata.json` file, or using `qlock rm <key name>` to remove a given key
+> will result in you no longer being able to decrypt your `.qlock` file(s).
+
+> The `qlock_metadata.json` file contains sensitive information, I strongly recommend against sending it over any networks or saving it to the cloud without first encrypting it.
+
+### Roadmap
+
+- [ ] add some tests.
+- [ ] add tab auto-complete for key names.
+- [ ] add support for other encryption schemes and hashing algorithms.
+  - ideally ones that are resistant to quantum attacks, and not based on NIST recommendations.
+- [ ] allow users to customize the parameters of the encryption and hashing algorithms where appropriate.
+- [ ] (maybe) make `qlock_metadata.json` global by moving it to `~/` and include path details in `EncryptedData`.
+- [ ] (maybe) add integration with a few popular password managers to automatically save passwords.
+- [ ] figure out what else is next.
