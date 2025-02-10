@@ -68,16 +68,36 @@ impl Encryptor {
         }
     }
 
-    pub fn encrypt_file(
+    pub fn encrypt_file_and_key(
         &self,
         file_path: &PathBuf,
         output_path: Option<String>,
+        name: Option<String>,
+        auto_gen_name: bool,
+        password_flag: Option<String>,
     ) -> Result<(), QlockError> {
-        let password = self.get_encryption_password_with("Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: ")?;
+        let key_name = self.get_key_name(name, auto_gen_name);
+
+        if let Err(e) = key_name {
+            return Err(e);
+        }
+
+        let password;
+
+        if let Some(pf) = password_flag {
+            if validate_password(&pf) {
+                password = pf;
+            } else {
+                std::process::exit(1);
+            }
+        } else {
+            password = self.get_encryption_password_with("Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: ")?;
+        }
+
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
 
         println!("Generating a random key and encrypting your data...");
-        let (ciphertext, nonce_a, og_key) = self.encrypt_contents(&contents)?;
+        let (ciphertext, nonce_a, og_key) = self.encrypt_file_contents(&contents)?;
         let output_path = self.determine_output_path(file_path, output_path);
 
         println!("Generating a password-derived key to encrypt the first key with...");
@@ -85,17 +105,15 @@ impl Encryptor {
         let hash_salt = self.crypto_utils.generate_salt();
         let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &hash_salt)?;
 
-        let key_name = self.get_key_name()?;
-
         let metadata = EncryptedData {
-            name: key_name,
+            name: key_name?,
             key: encrypted_key,
             hash: hash_bytes.to_vec(),
             nonce_a: nonce_a.to_vec(),
             nonce_b: nonce_b.to_vec(),
             salt: salt.to_vec(),
             hash_salt: hash_salt.to_vec(),
-            filename: file_path.to_string_lossy().to_string(),
+            input_filename: file_path.to_string_lossy().to_string(),
             output_filename: output_path.to_string_lossy().to_string(),
         };
 
@@ -106,7 +124,31 @@ impl Encryptor {
             .map_err(QlockError::IoError)
     }
 
-    fn get_key_name(&self) -> Result<String, QlockError> {
+    pub fn get_key_name(
+        &self,
+        provided_name: Option<String>,
+        auto_gen_name: bool,
+    ) -> Result<String, QlockError> {
+        if !provided_name.is_none() {
+            if MetadataManager.key_name_already_exists(&provided_name.clone().unwrap()) {
+                return Err(QlockError::KeyAlreadyExists(provided_name.unwrap()));
+            } else {
+                if auto_gen_name {
+                    println!(
+                        "-a (--auto-name) is ignored because -n (--name) is already specified"
+                    );
+                }
+                println!("Using key name: {}", provided_name.clone().unwrap());
+                return Ok(provided_name.unwrap());
+            }
+        }
+
+        if auto_gen_name {
+            let name = generate_random_name();
+            println!("Auto-generated name: {}", name);
+            return Ok(name);
+        }
+
         print!("Enter a name for your encrypted key (leave blank to auto-generate a name):");
         let _ = io::stdout().flush();
 
@@ -121,6 +163,9 @@ impl Encryptor {
             println!("Auto-generated name: {}", name);
             Ok(name)
         } else {
+            if MetadataManager.key_name_already_exists(key_name.trim()) {
+                return Err(QlockError::KeyAlreadyExists(key_name.trim().to_string()));
+            }
             Ok(key_name.trim().to_string())
         }
     }
@@ -135,7 +180,7 @@ impl Encryptor {
         }
     }
 
-    pub fn encrypt_contents(
+    pub fn encrypt_file_contents(
         &self,
         contents: &[u8],
     ) -> Result<(Vec<u8>, XNonce, chacha20poly1305::Key), QlockError> {
@@ -201,14 +246,21 @@ impl Decryptor {
         &self,
         file_path: &PathBuf,
         output_path: Option<String>,
+        password_flag: Option<String>,
     ) -> Result<(), QlockError> {
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
         let saved = MetadataManager.read().map_err(QlockError::IoError)?;
 
         for datum in saved.data {
             if self.verify_hash(&contents, &datum)? {
-                let filename = output_path.unwrap_or(datum.filename.clone());
-                let password = self.get_decryption_password()?;
+                let filename = output_path.unwrap_or(datum.input_filename.clone());
+                let password;
+
+                if let Some(pf) = password_flag {
+                    password = pf;
+                } else {
+                    password = self.get_decryption_password()?;
+                }
 
                 let decrypted_contents = self.decrypt_contents(&password, &contents, &datum)?;
                 return FileUtils::write_with_confirmation(
@@ -221,7 +273,7 @@ impl Decryptor {
         }
 
         println!(
-            "no matching key found in {} for file: {}",
+            "no matching key found in '{}' for file: '{}'",
             MetadataManager::METADATA_FILE,
             file_path.display()
         );
@@ -274,38 +326,38 @@ fn validate_password(password: &str) -> bool {
     let has_lowercase = password.chars().any(|c| c.is_lowercase());
 
     if password.len() < 16 {
-        println!("Password was too short, it should be at least 16 characters long...");
+        eprintln!("Password was too short, it should be at least 16 characters long...");
 
         if !has_uppercase || !has_lowercase {
-            println!("It should also contain a mix of upper and lower case letters");
+            eprintln!("It should also contain a mix of upper and lower case letters");
 
             if !has_number_or_punctuation {
-                println!("and at least 1 number or special character");
+                eprintln!("and at least 1 number or special character");
             }
         } else if !has_number_or_punctuation {
-            println!("It should also contain at least 1 number or special character\n");
+            eprintln!("It should also contain at least 1 number or special character\n");
         }
 
-        println!("Let's try again\n");
+        eprintln!("Let's try again");
 
         return false;
     }
 
     if !has_uppercase || !has_lowercase {
-        println!("Passwords should contain a mix of upper and lower case characters...\n");
+        eprintln!("Passwords should contain a mix of upper and lower case characters...\n");
 
         if !has_number_or_punctuation {
-            println!("It was also missing at least 1 number or special character\n");
+            eprintln!("It was also missing at least 1 number or special character\n");
         }
 
-        println!("Let's try again\n");
+        eprintln!("Let's try again");
 
         return false;
     }
 
     if !has_number_or_punctuation {
-        println!(
-            "Password was missing at least 1 number or special character...\n\nLet's try again\n"
+        eprintln!(
+            "Password was missing at least 1 number or special character...\n\nLet's try again"
         );
         return false;
     }

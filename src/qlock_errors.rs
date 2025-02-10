@@ -7,6 +7,7 @@ pub enum QlockError {
     DecryptionError(String),
     KeyDerivationError(String),
     MetadataNotFound(String),
+    KeyAlreadyExists(String),
 }
 
 impl std::fmt::Display for QlockError {
@@ -16,7 +17,8 @@ impl std::fmt::Display for QlockError {
             QlockError::EncryptionError(msg) => write!(f, "Encryption error: {}", msg),
             QlockError::DecryptionError(msg) => write!(f, "Decryption error: {}", msg),
             QlockError::KeyDerivationError(msg) => write!(f, "Key derivation error: {}", msg),
-            QlockError::MetadataNotFound(msg) => write!(f, "Metadata not found: {}", msg),
+            QlockError::MetadataNotFound(msg) => write!(f, "Metadata not found for: {}", msg),
+            QlockError::KeyAlreadyExists(msg) => write!(f, "A key named '{}' already exists, please choose a different name...", msg),
         }
     }
 }

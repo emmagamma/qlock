@@ -16,7 +16,7 @@ pub struct EncryptedData {
     pub nonce_b: Vec<u8>,
     pub salt: Vec<u8>,
     pub hash_salt: Vec<u8>,
-    pub filename: String,
+    pub input_filename: String,
     pub output_filename: String,
 }
 
@@ -39,11 +39,13 @@ impl MetadataManager {
         let mut saved_data = self.read()?;
         saved_data.data.push(additional_metadata.clone());
         self.save_metadata(&saved_data)?;
+
         println!(
-            "saved metadata for {} to: ./{}",
+            "saved metadata for encrypted key '{}' to: ./{}",
             additional_metadata.name,
             Self::METADATA_FILE
         );
+
         Ok(())
     }
 
@@ -60,7 +62,15 @@ impl MetadataManager {
         fs::write(Self::METADATA_FILE, serialized)
     }
 
-    pub fn list(&self) {
+    pub fn key_name_already_exists(&self, name: &str) -> bool {
+        if let Ok(saved_data) = self.read() {
+            saved_data.data.iter().any(|d| d.name == name)
+        } else {
+            false
+        }
+    }
+
+    pub fn list(&self, key_name: Option<String>) {
         if !Path::new(Self::METADATA_FILE).exists() {
             println!("{} does not exist, try encrypting something first or make sure you're in the correct directory.", Self::METADATA_FILE);
             return;
@@ -79,21 +89,36 @@ impl MetadataManager {
                     return;
                 }
                 for (index, datum) in saved_data.data.iter().enumerate() {
-                    println!("{}. name: {}", (index + 1), datum.name);
-                    println!("{:indent$}input file: {}", "", datum.filename, indent = 2);
-                    println!(
-                        "{:indent$}output file: {}",
-                        "",
-                        datum.output_filename,
-                        indent = 2
-                    );
-                    pretty_print_vec("encrypted key: ", &datum.key, 2, width);
-                    pretty_print_vec("hash of encrypted file: ", &datum.hash, 2, width);
-                    println!("");
+                    if key_name.is_some() {
+                        if datum.name == key_name.clone().unwrap() {
+                            self.print_one_key(index, datum, width);
+                        }
+                    } else {
+                        self.print_one_key(index, datum, width);
+                    }
                 }
             }
             Err(e) => println!("Error reading metadata: {}", e),
         }
+    }
+
+    fn print_one_key(&self, index: usize, datum: &EncryptedData, width: usize) {
+        println!("{}. name: {}", (index + 1), datum.name);
+        println!(
+            "{:indent$}input file: {}",
+            "",
+            datum.input_filename,
+            indent = 2
+        );
+        println!(
+            "{:indent$}output file: {}",
+            "",
+            datum.output_filename,
+            indent = 2
+        );
+        pretty_print_vec("encrypted key: ", &datum.key, 2, width);
+        pretty_print_vec("hash of encrypted file: ", &datum.hash, 2, width);
+        println!("");
     }
 
     pub fn remove_metadata(&self, name: &str) -> Result<bool, QlockError> {
@@ -105,7 +130,11 @@ impl MetadataManager {
             .ok_or(QlockError::MetadataNotFound(name.to_string()))?;
 
         println!(
-            "are you sure you want to PERMANENTLY DELETE all metadata for {}? (y/n)",
+            "You will no longer be able to decrypt {}",
+            saved_data.data[index].output_filename
+        );
+        println!(
+            "Are you sure you want to PERMANENTLY DELETE all metadata for {}? (y/n)",
             name
         );
 
@@ -115,7 +144,7 @@ impl MetadataManager {
             .map_err(QlockError::IoError)?;
 
         if input.trim() != "y" {
-            println!("metadata for {} is still saved", name);
+            println!("Metadata for {} is still saved", name);
             return Ok(false);
         }
 
@@ -125,7 +154,7 @@ impl MetadataManager {
             .map_err(QlockError::IoError)?;
 
         println!(
-            "removed metadata for {} from: ./{}",
+            "Removed metadata for {} from: ./{}",
             name,
             Self::METADATA_FILE
         );

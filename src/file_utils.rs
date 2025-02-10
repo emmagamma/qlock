@@ -7,7 +7,7 @@ pub struct FileUtils;
 impl FileUtils {
     pub fn prompt_for_overwrite(path: &Path, operation: &str) -> bool {
         println!(
-            "File {} already exists. Do you want to overwrite it with the {} contents? (y/n)",
+            "File '{}' already exists. Do you want to overwrite it with the {} contents? (y/n)",
             path.display(),
             operation
         );
