@@ -41,7 +41,7 @@ impl MetadataManager {
         self.save_metadata(&saved_data)?;
 
         println!(
-            "saved metadata for encrypted key '{}' to: ./{}",
+            "Saved metadata for encrypted key '{}' to: ./{}",
             additional_metadata.name,
             Self::METADATA_FILE
         );

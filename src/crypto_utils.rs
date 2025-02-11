@@ -68,6 +68,63 @@ impl Encryptor {
         }
     }
 
+    pub fn encrypt_dir(
+        &self,
+        file_path: &PathBuf,
+        output_path: Option<String>,
+        name: Option<String>,
+        auto_gen_name: bool,
+        password_flag: Option<String>,
+        mut index: u32,
+    ) -> Result<(), QlockError> {
+        let files = FileUtils::get_files_in_dir(file_path).unwrap();
+
+        for file in files {
+            let f = file.unwrap().path().clone();
+            if f.is_dir() {
+                if let Err(e) = self.encrypt_dir(
+                    &f.to_path_buf(),
+                    output_path.clone(),
+                    name.clone(),
+                    auto_gen_name,
+                    password_flag.clone(),
+                    index,
+                ) {
+                    return Err(e);
+                }
+            } else {
+                if f.extension().unwrap() != "qlock" {
+                    let new_name = match name {
+                        Some(ref n) => Some(format!("{}-{:04}", &n, index).to_string()),
+                        None => None,
+                    };
+                    let new_output = match output_path {
+                        Some(ref o) => {
+                            let output_stem = &o.split(".").collect::<Vec<&str>>()[0];
+                            Some(format!("{}-{:04}", &output_stem, index).to_string())
+                        }
+                        None => None,
+                    };
+
+                    println!("Encrypting contents of: {}", f.to_path_buf().display());
+                    if let Err(e) = self.encrypt_file_and_key(
+                        &f.to_path_buf(),
+                        new_output,
+                        new_name,
+                        auto_gen_name,
+                        password_flag.clone(),
+                    ) {
+                        return Err(e);
+                    } else {
+                        index += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn encrypt_file_and_key(
         &self,
         file_path: &PathBuf,
@@ -76,8 +133,12 @@ impl Encryptor {
         auto_gen_name: bool,
         password_flag: Option<String>,
     ) -> Result<(), QlockError> {
-        let key_name = self.get_key_name(name, auto_gen_name);
+        let contents = fs::read(file_path).map_err(QlockError::IoError);
+        if let Err(e) = contents {
+            return Err(e);
+        }
 
+        let key_name = self.get_key_name(name, auto_gen_name);
         if let Err(e) = key_name {
             return Err(e);
         }
@@ -94,10 +155,8 @@ impl Encryptor {
             password = self.get_encryption_password_with("Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: ")?;
         }
 
-        let contents = fs::read(file_path).map_err(QlockError::IoError)?;
-
         println!("Generating a random key and encrypting your data...");
-        let (ciphertext, nonce_a, og_key) = self.encrypt_file_contents(&contents)?;
+        let (ciphertext, nonce_a, og_key) = self.encrypt_file_contents(&contents?)?;
         let output_path = self.determine_output_path(file_path, output_path);
 
         println!("Generating a password-derived key to encrypt the first key with...");
@@ -120,7 +179,7 @@ impl Encryptor {
         MetadataManager
             .write(metadata)
             .map_err(QlockError::IoError)?;
-        FileUtils::write_with_confirmation(&output_path, &ciphertext, "encrypted")
+        FileUtils::write_with_confirmation(&output_path, &ciphertext, "Encrypted")
             .map_err(QlockError::IoError)
     }
 
@@ -204,6 +263,8 @@ impl Encryptor {
             Some(path) => PathBuf::from([path, ".qlock".to_string()].join("")),
             None => PathBuf::from(
                 [
+                    file_path.parent().unwrap().to_string_lossy().to_string(),
+                    "/".to_string(),
                     file_path.file_stem().unwrap().to_str().unwrap().to_string(),
                     ".qlock".to_string(),
                 ]
@@ -242,7 +303,57 @@ impl Decryptor {
         }
     }
 
-    pub fn decrypt_file(
+    pub fn decrypt_dir(
+        &self,
+        file_path: &PathBuf,
+        output_path: Option<String>,
+        password_flag: Option<String>,
+        mut index: u32,
+    ) -> Result<(), QlockError> {
+        let files = FileUtils::get_files_in_dir(file_path).unwrap();
+
+        for file in files {
+            let f = file.unwrap().path().clone();
+            if f.is_dir() {
+                if let Err(e) = self.decrypt_dir(
+                    &f.to_path_buf(),
+                    output_path.clone(),
+                    password_flag.clone(),
+                    index,
+                ) {
+                    return Err(e);
+                }
+            } else {
+                if f.extension().unwrap() == "qlock" {
+                    let new_output = match output_path {
+                        Some(ref o) => {
+                            let output_stem = &o.split(".").collect::<Vec<&str>>()[0];
+                            let output_extension = &o.split(".").collect::<Vec<&str>>()[1];
+                            Some(
+                                format!("{}-{:04}.{}", &output_stem, index, output_extension)
+                                    .to_string(),
+                            )
+                        }
+                        None => None,
+                    };
+
+                    println!("Decrypting file: {}", f.display());
+                    if let Err(e) = self.decrypt_key_and_file(
+                        &f.to_path_buf(),
+                        new_output,
+                        password_flag.clone(),
+                    ) {
+                        return Err(e);
+                    } else {
+                        index += 1;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn decrypt_key_and_file(
         &self,
         file_path: &PathBuf,
         output_path: Option<String>,
@@ -262,11 +373,12 @@ impl Decryptor {
                     password = self.get_decryption_password()?;
                 }
 
-                let decrypted_contents = self.decrypt_contents(&password, &contents, &datum)?;
+                let decrypted_contents =
+                    self.decrypt_file_contents(&password, &contents, &datum)?;
                 return FileUtils::write_with_confirmation(
                     Path::new(&filename),
                     &decrypted_contents,
-                    "decrypted",
+                    "Decrypted",
                 )
                 .map_err(QlockError::IoError);
             }
@@ -292,7 +404,7 @@ impl Decryptor {
             .map_err(|e| QlockError::IoError(io::Error::new(io::ErrorKind::Other, e)))
     }
 
-    pub fn decrypt_contents(
+    pub fn decrypt_file_contents(
         &self,
         password: &str,
         contents: &[u8],

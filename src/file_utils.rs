@@ -9,7 +9,7 @@ impl FileUtils {
         println!(
             "File '{}' already exists. Do you want to overwrite it with the {} contents? (y/n)",
             path.display(),
-            operation
+            operation.to_lowercase()
         );
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
@@ -23,7 +23,7 @@ impl FileUtils {
     ) -> io::Result<()> {
         if path.exists() && !Self::prompt_for_overwrite(path, operation) {
             println!(
-                "{} not modified\n\nNo {} data was output.",
+                "{} not modified\n\n{} data was not output.",
                 path.display(),
                 operation
             );
@@ -32,10 +32,14 @@ impl FileUtils {
         }
         fs::write(path, contents)?;
         println!(
-            "{} data was written to {} successfully",
+            "{} data was written to {} successfully\n",
             operation,
             path.display()
         );
         Ok(())
+    }
+
+    pub fn get_files_in_dir(path: &Path) -> io::Result<fs::ReadDir> {
+        fs::read_dir(path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 }

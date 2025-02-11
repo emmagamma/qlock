@@ -59,6 +59,16 @@ qlock -e <file path> -p <your password> --auto-name
 > Note: When using the -p flag, your password would be printed to the terminal and possibly saved in your bash history.
 > If you want to avoid that, use an .env file or similar solution so you can pass the environment variable instead.
 
+Encrypt/Decrypt a folder recursively:
+```bash
+qlock -e <path to folder>
+qlock -d <path to folder>
+```
+
+> Note: When encrypting, and passing an output and name for the key, an auto-incrementing 4 digit counter will be appended to each.
+> When decrypting, and passing an output, an auto-incrementing 4 digit counter will be appended before the file extension.
+> Also, during encryption we automatically ignore all `.qlock` files, and during decryption we only decrypt files ending in `.qlock`.
+
 ### Nerdy Details
 
 The way it works is by first generating a random key to encrypt the contents of your file,
@@ -78,11 +88,12 @@ two nonces, two salts, the input filename and output filename, and a user-provid
 
 ### Roadmap
 
-- [x] add flags to provide a name or auto-generate one.
-- [x] add ability to list the details for a just one key, by name.
-- [x] add password flag, so you can skip all prompts.
+- [x] ~~add flags to provide a name or auto-generate one.~~
+- [x] ~~add ability to list the details for a just one key, by name.~~
+- [x] ~~add password flag, so you can skip all prompts.~~
+- [x] ~~add support for folders during encryption/decryption.~~
+- [ ] add support for passing a list of files to encrypt/decrypt.
 - [ ] add some tests.
-- [ ] add support for multiple files, and folders.
 - [ ] add tab auto-complete for key names.
 - [ ] add support for other encryption schemes and hashing algorithms.
   - ideally ones that are resistant to quantum attacks, and not based on NIST recommendations.
