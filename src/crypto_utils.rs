@@ -335,12 +335,16 @@ impl Decryptor {
                 if f.extension().unwrap() == "qlock" {
                     let new_output = match output_path {
                         Some(ref o) => {
-                            let output_stem = &o.split(".").collect::<Vec<&str>>()[0];
-                            let output_extension = &o.split(".").collect::<Vec<&str>>()[1];
-                            Some(
-                                format!("{}-{:04}.{}", &output_stem, index, output_extension)
-                                    .to_string(),
-                            )
+                            if o.contains(".") {
+                                let output_stem = &o.split(".").collect::<Vec<&str>>()[0];
+                                let output_extension = &o.split(".").collect::<Vec<&str>>()[1];
+
+                                Some(
+                                    format!("{}-{:04}.{}", &output_stem, index, output_extension).to_string(),
+                                )
+                            } else {
+                                Some(format!("{}-{:04}", &o, index).to_string())
+                            }
                         }
                         None => None,
                     };
