@@ -29,7 +29,7 @@ impl FileUtils {
                     path.display(),
                     operation
                 );
-                println!("If this was a mistake, you would need to run the command again and use `y` to overwrite the file.");
+                println!("If this was a mistake, you would need to run the command again and use `y` to overwrite the file.\n");
                 return Ok(());
             }
         }
