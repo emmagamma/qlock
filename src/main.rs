@@ -18,8 +18,7 @@ struct Qlock {
 #[derive(Parser, Clone)]
 struct ActionArgs {
     /// The path of the file or folder you want to encrypt or decrypt
-    #[arg(value_parser = clap::value_parser!(PathBuf))]
-    #[arg(required = false)]
+    #[arg(value_parser = clap::value_parser!(PathBuf), required = false)]
     file: PathBuf,
 
     /// Encrypt a file, or all files within a folder recursively (excluding those ending in `.qlock`)
@@ -30,35 +29,37 @@ struct ActionArgs {
     #[arg(short = 'd', long = "decrypt", group = "action")]
     decrypt: bool,
 
-    /// (Optional) the password to encrypt your key with
-    ///
-    /// If password is not provided, you will be prompted for one
+    /// (Optional) the password to encrypt your key with. If password is not provided, you will be prompted for one
     ///
     /// It is recommended to use an environment variable and .env file, instead of typing it in
     /// plaintext on the command line
-    #[arg(short = 'p', long = "password")]
+    #[arg(short = 'p', long = "password", required = false)]
     password: Option<String>,
 
     /// (Optional) What to name the output file during encryption or decryption
     ///
     /// When encrypting/decrypting all files within a folder, an auto-incrementing 4 digit counter
     /// will be appended before the file extension
-    #[arg(short = 'o', long = "output")]
+    #[arg(short = 'o', long = "output", required = false)]
     output: Option<String>,
 
     /// (Optional) the name to save your encrypted key with, in `qlock_metadata.json`. Only with -e
     /// or --encrypt
     ///
     /// When encrypting all files within a folder, an auto-incrementing 4 digit counter will be appended to the end
-    #[arg(short = 'n', long = "name")]
+    #[arg(short = 'n', long = "name", required = false)]
     name: Option<String>,
 
     /// (Optional) skip the prompt for a key name and auto-generate one instead. Only with -e or
     /// --encrypt
     ///
     /// If -n (--name) is provided, this will be ignored and we'll use the provided name
-    #[arg(short = 'a', long = "auto-name")]
+    #[arg(short = 'a', long = "auto-name", required = false)]
     auto_name: bool,
+
+    /// (Optional) when provided, will skip (y/n) prompts and automatically overwrite existing files
+    #[arg(short = 'f', long = "force-overwrite", required = false)]
+    force: bool,
 }
 
 #[derive(Subcommand)]
@@ -110,6 +111,7 @@ fn main() -> Result<(), QlockError> {
                         action.name.clone(),
                         action.auto_name,
                         action.password.clone(),
+                        action.force,
                         0,
                     ) {
                         eprintln!("{}", e.to_string());
@@ -121,6 +123,7 @@ fn main() -> Result<(), QlockError> {
                         action.name,
                         action.auto_name,
                         action.password,
+                        action.force,
                     ) {
                         eprintln!("{}", e.to_string());
                     }
@@ -139,6 +142,7 @@ fn main() -> Result<(), QlockError> {
                         &action.file,
                         action.output.clone(),
                         action.password.clone(),
+                        action.force,
                         0,
                     ) {
                         eprintln!("{}", e.to_string());
@@ -148,6 +152,7 @@ fn main() -> Result<(), QlockError> {
                         &action.file,
                         action.output,
                         action.password,
+                        action.force,
                     ) {
                         eprintln!("{}", e.to_string());
                     }

@@ -75,6 +75,7 @@ impl Encryptor {
         name: Option<String>,
         auto_gen_name: bool,
         password_flag: Option<String>,
+        force: bool,
         mut index: u32,
     ) -> Result<(), QlockError> {
         let files = FileUtils::get_files_in_dir(file_path).unwrap();
@@ -88,6 +89,7 @@ impl Encryptor {
                     name.clone(),
                     auto_gen_name,
                     password_flag.clone(),
+                    force,
                     index,
                 ) {
                     return Err(e);
@@ -113,6 +115,7 @@ impl Encryptor {
                         new_name,
                         auto_gen_name,
                         password_flag.clone(),
+                        force,
                     ) {
                         return Err(e);
                     } else {
@@ -132,6 +135,7 @@ impl Encryptor {
         name: Option<String>,
         auto_gen_name: bool,
         password_flag: Option<String>,
+        force: bool,
     ) -> Result<(), QlockError> {
         let contents = fs::read(file_path).map_err(QlockError::IoError);
         if let Err(e) = contents {
@@ -179,7 +183,7 @@ impl Encryptor {
         MetadataManager
             .write(metadata)
             .map_err(QlockError::IoError)?;
-        FileUtils::write_with_confirmation(&output_path, &ciphertext, "Encrypted")
+        FileUtils::write_with_confirmation(&output_path, &ciphertext, "Encrypted", force)
             .map_err(QlockError::IoError)
     }
 
@@ -259,17 +263,19 @@ impl Encryptor {
         file_path: &PathBuf,
         output_path: Option<String>,
     ) -> PathBuf {
+        let parent_dir = file_path.parent().unwrap().to_string_lossy().to_string();
+        let stem = file_path.file_stem().unwrap().to_str().unwrap().to_string();
+        let fallback;
+
+        if parent_dir.trim().is_empty() {
+            fallback = [stem, ".qlock".to_string()].join("");
+        } else {
+            fallback = [parent_dir, "/".to_string(), stem, ".qlock".to_string()].join("");
+        }
+
         match output_path {
             Some(path) => PathBuf::from([path, ".qlock".to_string()].join("")),
-            None => PathBuf::from(
-                [
-                    file_path.parent().unwrap().to_string_lossy().to_string(),
-                    "/".to_string(),
-                    file_path.file_stem().unwrap().to_str().unwrap().to_string(),
-                    ".qlock".to_string(),
-                ]
-                .join(""),
-            ),
+            None => PathBuf::from(fallback),
         }
     }
 
@@ -308,6 +314,7 @@ impl Decryptor {
         file_path: &PathBuf,
         output_path: Option<String>,
         password_flag: Option<String>,
+        force: bool,
         mut index: u32,
     ) -> Result<(), QlockError> {
         let files = FileUtils::get_files_in_dir(file_path).unwrap();
@@ -319,6 +326,7 @@ impl Decryptor {
                     &f.to_path_buf(),
                     output_path.clone(),
                     password_flag.clone(),
+                    force,
                     index,
                 ) {
                     return Err(e);
@@ -342,6 +350,7 @@ impl Decryptor {
                         &f.to_path_buf(),
                         new_output,
                         password_flag.clone(),
+                        force,
                     ) {
                         return Err(e);
                     } else {
@@ -358,6 +367,7 @@ impl Decryptor {
         file_path: &PathBuf,
         output_path: Option<String>,
         password_flag: Option<String>,
+        force: bool,
     ) -> Result<(), QlockError> {
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
         let saved = MetadataManager.read().map_err(QlockError::IoError)?;
@@ -379,6 +389,7 @@ impl Decryptor {
                     Path::new(&filename),
                     &decrypted_contents,
                     "Decrypted",
+                    force,
                 )
                 .map_err(QlockError::IoError);
             }

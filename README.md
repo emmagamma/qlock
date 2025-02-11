@@ -92,6 +92,7 @@ two nonces, two salts, the input filename and output filename, and a user-provid
 - [x] ~~add ability to list the details for a just one key, by name.~~
 - [x] ~~add password flag, so you can skip all prompts.~~
 - [x] ~~add support for folders during encryption/decryption.~~
+- [x] ~~add -f --force-overwrite to skip the checks before overwriting files.~~
 - [ ] add support for passing a list of files to encrypt/decrypt.
 - [ ] add some tests.
 - [ ] add tab auto-complete for key names.

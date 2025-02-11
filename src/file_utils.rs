@@ -20,15 +20,18 @@ impl FileUtils {
         path: &Path,
         contents: &[u8],
         operation: &str,
+        force: bool,
     ) -> io::Result<()> {
-        if path.exists() && !Self::prompt_for_overwrite(path, operation) {
-            println!(
-                "{} not modified\n\n{} data was not output.",
-                path.display(),
-                operation
-            );
-            println!("If this was a mistake, you would need to run the command again and use `y` to overwrite the file.");
-            return Ok(());
+        if !force {
+            if path.exists() && !Self::prompt_for_overwrite(path, operation) {
+                println!(
+                    "{} not modified\n\n{} data was not output.",
+                    path.display(),
+                    operation
+                );
+                println!("If this was a mistake, you would need to run the command again and use `y` to overwrite the file.");
+                return Ok(());
+            }
         }
         fs::write(path, contents)?;
         println!(
