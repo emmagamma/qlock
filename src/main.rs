@@ -21,7 +21,7 @@ struct ActionArgs {
     #[arg(value_parser = clap::value_parser!(PathBuf), required = false)]
     file: PathBuf,
 
-    /// Encrypt a file, or all files within a folder recursively (excluding those ending in `.qlock`)
+    /// Encrypt a file, or all files within a folder recursively (excluding those ending in `.qlock`, and `qlock_metadata.json`)
     #[arg(short = 'e', long = "encrypt", group = "action")]
     encrypt: bool,
 

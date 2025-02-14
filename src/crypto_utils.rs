@@ -95,7 +95,7 @@ impl Encryptor {
                     return Err(e);
                 }
             } else {
-                if f.extension().unwrap() != "qlock" {
+                if f.extension().unwrap() != "qlock" && f.file_name().unwrap() != "qlock_metadata.json" {
                     let new_name = match name {
                         Some(ref n) => Some(format!("{}-{:04}", &n, index).to_string()),
                         None => None,
