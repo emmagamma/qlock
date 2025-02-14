@@ -164,9 +164,9 @@ impl Encryptor {
         let output_path = self.determine_output_path(file_path, output_path);
 
         println!("Generating a password-derived key to encrypt the first key with...");
-        let (encrypted_key, nonce_b, salt) = self.encrypt_key(&password, &og_key.to_vec())?;
-        let hash_salt = self.crypto_utils.generate_salt();
-        let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &hash_salt)?;
+        let (encrypted_key, nonce_b, salt_a) = self.encrypt_key(&password, &og_key.to_vec())?;
+        let salt_b = self.crypto_utils.generate_salt();
+        let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &salt_b)?;
 
         let metadata = EncryptedData {
             name: key_name?,
@@ -174,8 +174,8 @@ impl Encryptor {
             hash: hash_bytes.to_vec(),
             nonce_a: nonce_a.to_vec(),
             nonce_b: nonce_b.to_vec(),
-            salt: salt.to_vec(),
-            hash_salt: hash_salt.to_vec(),
+            salt_a: salt_a.to_vec(),
+            salt_b: salt_b.to_vec(),
             input_filename: file_path.to_string_lossy().to_string(),
             output_filename: output_path.to_string_lossy().to_string(),
         };
@@ -410,7 +410,7 @@ impl Decryptor {
     pub fn verify_hash(&self, contents: &[u8], datum: &EncryptedData) -> Result<bool, QlockError> {
         let hash = self
             .crypto_utils
-            .generate_hash(contents, &datum.hash_salt)?;
+            .generate_hash(contents, &datum.salt_b)?;
         Ok(hash.to_vec() == datum.hash)
     }
 
@@ -427,7 +427,7 @@ impl Decryptor {
     ) -> Result<Vec<u8>, QlockError> {
         let derived_key = self
             .crypto_utils
-            .derive_key(password.as_bytes(), &datum.salt)?;
+            .derive_key(password.as_bytes(), &datum.salt_a)?;
 
         let cipher_b = XChaCha20Poly1305::new((&derived_key).into());
         let nonce_b = XNonce::from_slice(&datum.nonce_b);

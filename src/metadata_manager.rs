@@ -14,8 +14,8 @@ pub struct EncryptedData {
     pub key: Vec<u8>,
     pub nonce_a: Vec<u8>,
     pub nonce_b: Vec<u8>,
-    pub salt: Vec<u8>,
-    pub hash_salt: Vec<u8>,
+    pub salt_a: Vec<u8>,
+    pub salt_b: Vec<u8>,
     pub input_filename: String,
     pub output_filename: String,
 }
