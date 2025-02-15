@@ -20,14 +20,26 @@ cargo build --release && cp target/release/qlock /usr/local/bin/qlock
 
 ### Usage
 
-The basics:
+Encrypt/Decrypt a file:
 ```bash
 # encrypt a file
 qlock -e <file path>
 
 # decrypt the encrypted file
 qlock -d <path to .qlock file>
+```
 
+Encrypt/Decrypt a folder recursively:
+```bash
+# encrypt a folder, ignores all `.qlock` files and `qlock_metadata.json`
+qlock -e <path to folder>
+
+# decrypt the encrypted folder, only decrypts files ending in `.qlock`
+qlock -d <path to folder>
+```
+
+List or remove saved keys and metadata:
+```bash
 # list out all encrypted keys with some metadata
 qlock ls
 
@@ -37,14 +49,20 @@ qlock rm <key name>
 
 Specify an output file name:
 ```bash
-# specify an optional output to name the encrypted file, note that `.qlock` will be appended to it automatically.
-# if no output name is provided, we use the original file name with `.qlock` instead of it's original extension.
-qlock -e <file path> -o <output file name>
+# specify an optional output to name the encrypted file(s)
+# any file extension you specify will be ignored, and `.qlock` will be used instead
+# if no output name is provided, we use the original file name with `.qlock` as the extension
+qlock -e <file or folder path> -o <output file name>
 
-# specify an optional output to name the decrypted file, including the file extension to use.
-# if no output name is provided, we use the original file name saved in `qlock_metadata.json` from when the file was encrypted.
-qlock -d <path to .qlock file> -o <output file name>
+# specify an optional output to name the decrypted file(s), *including* the file extension to use.
+# if no output name is provided, we use the original file name saved in `qlock_metadata.json`.
+qlock -d <path to .qlock file, or folder> -o <output file name>
 ```
+
+> Note: When specifying an output, an auto-incrementing 4 digit counter will be appended to each file name.
+> So using `qlock -e <path> -o output` with a folder containing 3 files would yield: `output-0000.qlock`, `output-0001.qlock`, and `output-0002.qlock`.
+> This also means that specifying an output forces files to be output flatly in whichever directory you run this tool from.
+> When no output is specified, during encryption `.qlock` files are generated next to the originals within the folder structure, and the decrypted output files are put back into the original file locations using the original file names.
 
 Skip the prompts:
 ```bash

@@ -164,7 +164,7 @@ impl MetadataManager {
 }
 
 fn pretty_print_vec(preceeding: &str, vec: &[u8], indent: usize, width: usize) {
-    let formatted = format!("{}{:?}", preceeding, vec); // Format the Vec<u8> using Debug trait
+    let formatted = format!("{}{:?}", preceeding, vec);
 
     let indented = textwrap::fill(&formatted, width / 2)
         .lines()

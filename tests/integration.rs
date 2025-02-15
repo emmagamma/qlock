@@ -14,14 +14,12 @@ mod tests {
     fn test_encrypt_and_decrypt_one_file() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(&[("test.txt", "Lorem ipsum and so forth...")], &[])?;
 
-        // Encrypt
         let encrypt_args = &["-e", "test.txt", "-p", "sixteenCharsPlus1", "-af"];
         let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
         assert_command_success(&encrypt_output);
         assert!(String::from_utf8_lossy(&encrypt_output.stdout).contains("data was written to"));
         assert_file_exists(&temp_dir, "test.qlock");
 
-        // Decrypt
         let decrypt_args = &["-d", "test.qlock", "-p", "sixteenCharsPlus1", "-f"];
         let decrypt_output = execute_qlock_command(&temp_dir, decrypt_args)?;
         assert_command_success(&decrypt_output);
@@ -43,7 +41,6 @@ mod tests {
             &["test", "test/nested"],
         )?;
 
-        // Encrypt
         let encrypt_args = &["-e", "test", "-p", "sixteenCharsPlus1", "-af"];
         let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
         assert_command_success(&encrypt_output);
@@ -52,7 +49,6 @@ mod tests {
         assert_file_exists(&temp_dir, "test/nested/one.qlock");
         assert_file_exists(&temp_dir, "test/nested/two.qlock");
 
-        // Decrypt
         let decrypt_args = &["-d", "test", "-p", "sixteenCharsPlus1", "-f"];
         let decrypt_output = execute_qlock_command(&temp_dir, decrypt_args)?;
         assert_command_success(&decrypt_output);
@@ -86,14 +82,10 @@ mod tests {
             &["test", "test/nested"],
         )?;
 
-        // Encrypt
         let encrypt_args = &[
-            "-e",
-            "test",
-            "-p",
-            "sixteenCharsPlus1",
-            "-o",
-            "output",
+            "-e", "test",
+            "-p", "sixteenCharsPlus1",
+            "-o", "output",
             "-af",
         ];
         let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
@@ -104,14 +96,10 @@ mod tests {
         assert_file_exists(&temp_dir, "output-0001.qlock");
         assert_file_exists(&temp_dir, "output-0002.qlock");
 
-        // Decrypt
         let decrypt_args = &[
-            "-d",
-            temp_dir.path().to_str().unwrap(),
-            "-p",
-            "sixteenCharsPlus1",
-            "-o",
-            "output.md",
+            "-d", temp_dir.path().to_str().unwrap(),
+            "-p", "sixteenCharsPlus1",
+            "-o", "output.md",
             "-f",
         ];
         let decrypt_output = execute_qlock_command(&temp_dir, decrypt_args)?;

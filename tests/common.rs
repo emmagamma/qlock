@@ -2,7 +2,6 @@ use assert_cmd::Command;
 use std::fs;
 use tempfile::TempDir;
 
-// Helper function to create a temporary directory and write files
 pub fn setup_test_directory(
     files: &[(&str, &str)],
     directories: &[&str],
@@ -20,7 +19,6 @@ pub fn setup_test_directory(
     Ok(temp_dir)
 }
 
-// Helper function to execute the qlock command
 pub fn execute_qlock_command(
     temp_dir: &TempDir,
     args: &[&str],
@@ -32,17 +30,14 @@ pub fn execute_qlock_command(
     Ok(cmd.assert().get_output().to_owned())
 }
 
-// Helper function to assert successful command execution
 pub fn assert_command_success(output: &std::process::Output) {
     assert!(output.status.success());
 }
 
-// Helper function to assert that a file exists
 pub fn assert_file_exists(temp_dir: &TempDir, file_path: &str) {
     assert!(temp_dir.path().join(file_path).exists());
 }
 
-// Helper function to assert that a file contains specific contents
 pub fn assert_file_contents(
     temp_dir: &TempDir,
     file_path: &str,
@@ -50,5 +45,6 @@ pub fn assert_file_contents(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file_contents = fs::read_to_string(temp_dir.path().join(file_path))?;
     assert_eq!(file_contents, expected_contents);
+
     Ok(())
 }
