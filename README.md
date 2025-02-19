@@ -2,7 +2,9 @@
 
 **(pronounced 'Queue Lock', or 'clock' if ur feelin spicy?)**
 
-A CLI tool written in Rust for encrypting files locally with XChaCha20Poly1305 and Argon2 hashing.
+A CLI tool written in Rust for encrypting files locally with XChaCha20Poly1305 and Argon2 hashing/key-derivation.
+
+To encrypt files locally before uploading them to cloud storage or sending them over the network. A file named `qlock_metadata.json` will be created in whichever directory you run this command from. This file is sensitive and should not be shared or sent over the network. You need your `qlock_metadata.json` file along with a password you provide to encrypt/decrypt each file. Passwords are not stored locally so we suggest using a password manager.
 
 ## Installation
 
