@@ -51,9 +51,10 @@ struct ActionArgs {
     /// Password(s) for each file.
     ///
     /// Can be specified as:
-    /// 1. A comma-separated list: -p "pass1, pass2, pass3"
+    /// 1. A single string: -p "password"
+    /// 2. A comma-separated list: -p "pass1, pass2, pass3"
     /// (To include commas in a password, just escape them: `-p "pass1, pass2\,With\,Commas, pass3"`)
-    /// 2. Numbered flags: -p1="pass1" -p2="pass2" -p3="pass3"
+    /// 3. Numbered flags: -p1="pass1" -p2="pass2" -p3="pass3"
     #[arg(
         short = 'p',
         long = "password",
