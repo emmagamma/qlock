@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 pub struct FileUtils;
 
@@ -42,7 +43,29 @@ impl FileUtils {
         Ok(())
     }
 
-    pub fn get_files_in_dir(path: &Path) -> io::Result<fs::ReadDir> {
-        fs::read_dir(path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    pub fn collect_files(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
+        let mut all_files = Vec::new();
+
+        for path in paths {
+            if path.is_file() {
+                all_files.push(path.to_path_buf());
+            }
+        }
+
+        for path in paths {
+            if path.is_dir() {
+                let mut dir_files: Vec<_> = WalkDir::new(path)
+                    .follow_links(true)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_file())
+                    .map(|e| e.path().to_path_buf())
+                    .collect();
+                dir_files.sort();
+                all_files.extend(dir_files);
+            }
+        }
+
+        Ok(all_files)
     }
 }

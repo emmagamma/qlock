@@ -10,6 +10,12 @@ pub enum QlockError {
     KeyAlreadyExists(String),
 }
 
+impl From<io::Error> for QlockError {
+    fn from(error: io::Error) -> Self {
+        QlockError::IoError(error)
+    }
+}
+
 impl std::fmt::Display for QlockError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

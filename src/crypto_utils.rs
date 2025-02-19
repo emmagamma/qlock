@@ -55,6 +55,39 @@ impl CryptoUtils {
             .map_err(|e| QlockError::KeyDerivationError(e.to_string()))?;
         Ok(derived_key)
     }
+
+    pub fn parse_passwords(input: &[String]) -> Vec<String> {
+        if input.len() == 1 && input[0].contains(',') {
+            let mut passwords = Vec::new();
+            let mut current = String::new();
+            let mut in_escape = false;
+
+            for c in input[0].chars() {
+                match (c, in_escape) {
+                    ('\\', false) => in_escape = true,
+                    (',', false) => {
+                        if !current.is_empty() {
+                            passwords.push(current.trim().to_string());
+                            current = String::new();
+                        }
+                    },
+                    (c, true) => {
+                        current.push(c);
+                        in_escape = false;
+                    },
+                    (c, false) => current.push(c),
+                }
+            }
+
+            if !current.is_empty() {
+                passwords.push(current.trim().to_string());
+            }
+
+            passwords
+        } else {
+            input.to_vec()
+        }
+    }
 }
 
 pub struct Encryptor {
@@ -68,60 +101,35 @@ impl Encryptor {
         }
     }
 
-    pub fn encrypt_dir(
+    pub fn encrypt_files(
         &self,
-        file_path: &PathBuf,
-        output_path: Option<String>,
-        name: Option<String>,
+        files: Vec<PathBuf>,
+        outputs: Vec<String>,
+        names: Vec<String>,
+        passwords: Vec<String>,
         auto_gen_name: bool,
-        password_flag: Option<String>,
         force: bool,
-        mut index: u32,
     ) -> Result<(), QlockError> {
-        let files = FileUtils::get_files_in_dir(file_path).unwrap();
+        let all_files = FileUtils::collect_files(&files)?;
+        let total_files = all_files.len();
 
-        for file in files {
-            let f = file.unwrap().path().clone();
-            if f.is_dir() {
-                if let Err(e) = self.encrypt_dir(
-                    &f.to_path_buf(),
-                    output_path.clone(),
-                    name.clone(),
+        let passwords = CryptoUtils::parse_passwords(&passwords);
+
+        for (idx, file) in all_files.iter().enumerate() {
+            let password = passwords.get(idx).cloned();
+            let name = names.get(idx).cloned();
+
+            if file.file_name().unwrap().to_str().unwrap() != "qlock_metadata.json" && !file.as_path().ends_with(".qlock") {
+                self.encrypt_file_and_key(
+                    file,
+                    &outputs,
+                    name,
                     auto_gen_name,
-                    password_flag.clone(),
+                    password,
                     force,
-                    index,
-                ) {
-                    return Err(e);
-                }
-            } else {
-                if f.extension().unwrap() != "qlock" && f.file_name().unwrap() != "qlock_metadata.json" {
-                    let new_name = match name {
-                        Some(ref n) => Some(format!("{}-{:04}", &n, index).to_string()),
-                        None => None,
-                    };
-                    let new_output = match output_path {
-                        Some(ref o) => {
-                            let output_stem = &o.split(".").collect::<Vec<&str>>()[0];
-                            Some(format!("{}-{:04}", &output_stem, index).to_string())
-                        }
-                        None => None,
-                    };
-
-                    println!("Encrypting contents of: {}", f.to_path_buf().display());
-                    if let Err(e) = self.encrypt_file_and_key(
-                        &f.to_path_buf(),
-                        new_output,
-                        new_name,
-                        auto_gen_name,
-                        password_flag.clone(),
-                        force,
-                    ) {
-                        return Err(e);
-                    } else {
-                        index += 1;
-                    }
-                }
+                    idx,
+                    total_files,
+                )?;
             }
         }
 
@@ -131,12 +139,15 @@ impl Encryptor {
     pub fn encrypt_file_and_key(
         &self,
         file_path: &PathBuf,
-        output_path: Option<String>,
+        output_path: &[String],
         name: Option<String>,
         auto_gen_name: bool,
         password_flag: Option<String>,
         force: bool,
+        idx: usize,
+        total_files: usize,
     ) -> Result<(), QlockError> {
+        println!("Encrypting file: {}", file_path.to_str().unwrap());
         let contents = fs::read(file_path).map_err(QlockError::IoError);
         if let Err(e) = contents {
             return Err(e);
@@ -161,7 +172,7 @@ impl Encryptor {
 
         println!("Generating a random key and encrypting your data...");
         let (ciphertext, nonce_a, og_key) = self.encrypt_file_contents(&contents?)?;
-        let output_path = self.determine_output_path(file_path, output_path);
+        let output_path = self.determine_output_path(file_path, output_path, idx, total_files);
 
         println!("Generating a password-derived key to encrypt the first key with...");
         let (encrypted_key, nonce_b, salt_a) = self.encrypt_key(&password, &og_key.to_vec())?;
@@ -261,21 +272,39 @@ impl Encryptor {
     pub fn determine_output_path(
         &self,
         file_path: &PathBuf,
-        output_path: Option<String>,
+        outputs: &[String],
+        idx: usize,
+        total_files: usize,
     ) -> PathBuf {
         let parent_dir = file_path.parent().unwrap().to_string_lossy().to_string();
         let stem = file_path.file_stem().unwrap().to_str().unwrap().to_string();
-        let fallback;
 
-        if parent_dir.trim().is_empty() {
-            fallback = [stem, ".qlock".to_string()].join("");
-        } else {
-            fallback = [parent_dir, "/".to_string(), stem, ".qlock".to_string()].join("");
-        }
-
-        match output_path {
-            Some(path) => PathBuf::from([path, ".qlock".to_string()].join("")),
-            None => PathBuf::from(fallback),
+        match outputs {
+            // Single output with multiple files - add counter to all files
+            outputs if outputs.len() == 1 && total_files > 1 => {
+                PathBuf::from(format!("{}-{:04}.qlock", outputs[0].trim(), idx))
+            }
+            // Multiple outputs specified - use corresponding output or fall back to original filename
+            outputs if !outputs.is_empty() => {
+                if let Some(output) = outputs.get(idx) {
+                    PathBuf::from(format!("{}.qlock", output.trim()))
+                } else {
+                    // More files than outputs - fall back to original filename
+                    if parent_dir.trim().is_empty() {
+                        PathBuf::from(format!("{}.qlock", stem))
+                    } else {
+                        PathBuf::from(format!("{}/{}.qlock", parent_dir, stem))
+                    }
+                }
+            }
+            // No outputs specified - use original filename
+            _ => {
+                if parent_dir.trim().is_empty() {
+                    PathBuf::from(format!("{}.qlock", stem))
+                } else {
+                    PathBuf::from(format!("{}/{}.qlock", parent_dir, stem))
+                }
+            }
         }
     }
 
@@ -309,78 +338,64 @@ impl Decryptor {
         }
     }
 
-    pub fn decrypt_dir(
+    pub fn decrypt_files(
         &self,
-        file_path: &PathBuf,
-        output_path: Option<String>,
-        password_flag: Option<String>,
+        files: Vec<PathBuf>,
+        outputs: Vec<String>,
+        passwords: Vec<String>,
         force: bool,
-        mut index: u32,
     ) -> Result<(), QlockError> {
-        let files = FileUtils::get_files_in_dir(file_path).unwrap();
+        let all_files = FileUtils::collect_files(&files)?;
+        let qlock_files: Vec<_> = all_files.iter()
+            .filter(|f| f.extension().map_or(false, |ext| ext == "qlock"))
+            .collect();
+        let total_files = qlock_files.len();
 
-        for file in files {
-            let f = file.unwrap().path().clone();
-            if f.is_dir() {
-                if let Err(e) = self.decrypt_dir(
-                    &f.to_path_buf(),
-                    output_path.clone(),
-                    password_flag.clone(),
-                    force,
-                    index,
-                ) {
-                    return Err(e);
-                }
+        let passwords = CryptoUtils::parse_passwords(&passwords);
+
+        for (idx, file) in qlock_files.iter().enumerate() {
+            let password = passwords.get(idx).cloned();
+            let outputs: Vec<String> = if outputs.len() == 1 && outputs[0].contains(',') {
+                outputs[0]
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect()
             } else {
-                if f.extension().unwrap() == "qlock" {
-                    let new_output = match output_path {
-                        Some(ref o) => {
-                            if o.contains(".") {
-                                let output_stem = &o.split(".").collect::<Vec<&str>>()[0];
-                                let output_extension = &o.split(".").collect::<Vec<&str>>()[1];
+                outputs.clone()
+            };
 
-                                Some(
-                                    format!("{}-{:04}.{}", &output_stem, index, output_extension).to_string(),
-                                )
-                            } else {
-                                Some(format!("{}-{:04}", &o, index).to_string())
-                            }
-                        }
-                        None => None,
-                    };
-
-                    println!("Decrypting file: {}", f.display());
-                    if let Err(e) = self.decrypt_key_and_file(
-                        &f.to_path_buf(),
-                        new_output,
-                        password_flag.clone(),
-                        force,
-                    ) {
-                        return Err(e);
-                    } else {
-                        index += 1;
-                    }
-                }
-            }
+            self.decrypt_key_and_file(
+                file,
+                outputs.clone(),
+                password,
+                force,
+                idx,
+                total_files,
+            )?;
         }
+
         Ok(())
     }
 
     pub fn decrypt_key_and_file(
         &self,
         file_path: &PathBuf,
-        output_path: Option<String>,
+        output_path: Vec<String>,
         password_flag: Option<String>,
         force: bool,
+        idx: usize,
+        total_files: usize,
     ) -> Result<(), QlockError> {
+        println!("Decrypting file: {}", file_path.to_str().unwrap());
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
         let saved = MetadataManager.read().map_err(QlockError::IoError)?;
 
         for datum in saved.data {
             if self.verify_hash(&contents, &datum)? {
-                let filename = output_path.unwrap_or(datum.input_filename.clone());
-                let password;
+                let output_path =
+                    self.determine_output_path(&datum, &output_path, idx, total_files);
 
+                let password;
                 if let Some(pf) = password_flag {
                     password = pf;
                 } else {
@@ -390,7 +405,7 @@ impl Decryptor {
                 let decrypted_contents =
                     self.decrypt_file_contents(&password, &contents, &datum)?;
                 return FileUtils::write_with_confirmation(
-                    Path::new(&filename),
+                    &output_path,
                     &decrypted_contents,
                     "Decrypted",
                     force,
@@ -408,9 +423,7 @@ impl Decryptor {
     }
 
     pub fn verify_hash(&self, contents: &[u8], datum: &EncryptedData) -> Result<bool, QlockError> {
-        let hash = self
-            .crypto_utils
-            .generate_hash(contents, &datum.salt_b)?;
+        let hash = self.crypto_utils.generate_hash(contents, &datum.salt_b)?;
         Ok(hash.to_vec() == datum.hash)
     }
 
@@ -442,6 +455,51 @@ impl Decryptor {
         cipher_a
             .decrypt(nonce_a, contents)
             .map_err(|e| QlockError::DecryptionError(e.to_string()))
+    }
+
+    pub fn determine_output_path(
+        &self,
+        metadata: &EncryptedData,
+        outputs: &[String],
+        idx: usize,
+        total_files: usize,
+    ) -> PathBuf {
+        let original_ext = Path::new(&metadata.input_filename)
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or("txt");
+
+        let path = match outputs {
+            // Single output with multiple files - add counter and extension
+            outputs if outputs.len() == 1 && total_files > 1 => {
+                let base_name = &outputs[0].trim();
+                if Path::new(base_name).extension().is_some() {
+                    let stem = Path::new(base_name).file_stem().unwrap().to_str().unwrap();
+                    let ext = Path::new(base_name).extension().unwrap().to_str().unwrap();
+                    PathBuf::from(format!("{}-{:04}.{}", stem, idx, ext))
+                } else {
+                    PathBuf::from(format!("{}-{:04}.{}", base_name, idx, original_ext))
+                }
+            }
+            // Multiple outputs specified - use corresponding output or fall back
+            outputs if outputs.len() > 1 => {
+                if let Some(output) = outputs.get(idx) {
+                    let output = output.trim();
+                    if Path::new(output).extension().is_some() {
+                        PathBuf::from(output)
+                    } else {
+                        PathBuf::from(format!("{}.{}", output, original_ext))
+                    }
+                } else {
+                    PathBuf::from(&metadata.input_filename)
+                }
+            }
+            // No output specified - use original filename
+            _ => PathBuf::from(&metadata.input_filename),
+        };
+
+        path
     }
 }
 
