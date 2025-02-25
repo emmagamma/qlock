@@ -37,15 +37,15 @@ struct Qlock {
 
 #[derive(Parser, Clone)]
 struct ActionArgs {
-    /// A File, list of files, or a directory to encrypt/decrypt. For multiple files, separate with spaces
+    /// A File, multiple files, or a directory to encrypt/decrypt. For multiple files, separate with spaces
     #[arg(value_parser = clap::value_parser!(PathBuf), required = false, num_args = 1..)]
     files: Vec<PathBuf>,
 
-    /// Encrypt a file, or all files within a folder recursively (excluding those ending in `.qlock`, and `qlock_metadata.json`)
+    /// Encrypt a file, multiple files, or all files within a folder recursively (excluding those ending in `.qlock`, and `qlock_metadata.json`)
     #[arg(short = 'e', long = "encrypt", group = "action")]
     encrypt: bool,
 
-    /// Decrypt a `.qlock` file, or all `.qlock` files within a folder recursively
+    /// Decrypt a `.qlock` file, multiple `.qlock` files, or all `.qlock` files within a folder recursively
     #[arg(short = 'd', long = "decrypt", group = "action")]
     decrypt: bool,
 
