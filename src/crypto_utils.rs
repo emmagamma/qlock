@@ -129,6 +129,8 @@ impl Encryptor {
 
         let passwords = CryptoUtils::parse_passwords(&passwords);
 
+        let names: Vec<_> = names.iter().map(|s| s.trim().to_string()).collect();
+
         for (idx, file) in filtered_files.iter().enumerate() {
             let password = passwords.get(idx).cloned();
             let name = names.get(idx).cloned();
