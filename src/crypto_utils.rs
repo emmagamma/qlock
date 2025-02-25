@@ -70,11 +70,11 @@ impl CryptoUtils {
                             passwords.push(current.trim().to_string());
                             current = String::new();
                         }
-                    },
+                    }
                     (c, true) => {
                         current.push(c);
                         in_escape = false;
-                    },
+                    }
                     (c, false) => current.push(c),
                 }
             }
@@ -111,26 +111,38 @@ impl Encryptor {
         force: bool,
     ) -> Result<(), QlockError> {
         let all_files = FileUtils::collect_files(&files)?;
-        let total_files = all_files.len();
+        let filtered_files: Vec<_> = all_files
+            .iter()
+            .filter(|f| f.extension().map_or(false, |ext| ext != "qlock"))
+            .filter(|f| {
+                f.file_name()
+                    .map_or(false, |fname| fname != "qlock_metadata.json")
+            })
+            .collect();
+
+        if filtered_files.is_empty() {
+            println!("No files found for the specified mode.");
+            return Ok(());
+        }
+
+        let total_files = filtered_files.len();
 
         let passwords = CryptoUtils::parse_passwords(&passwords);
 
-        for (idx, file) in all_files.iter().enumerate() {
+        for (idx, file) in filtered_files.iter().enumerate() {
             let password = passwords.get(idx).cloned();
             let name = names.get(idx).cloned();
 
-            if file.file_name().unwrap().to_str().unwrap() != "qlock_metadata.json" && !file.as_path().ends_with(".qlock") {
-                self.encrypt_file_and_key(
-                    file,
-                    &outputs,
-                    name,
-                    auto_gen_name,
-                    password,
-                    force,
-                    idx,
-                    total_files,
-                )?;
-            }
+            self.encrypt_file_and_key(
+                file,
+                &outputs,
+                name,
+                auto_gen_name,
+                password,
+                force,
+                idx,
+                total_files,
+            )?;
         }
 
         Ok(())
@@ -346,7 +358,8 @@ impl Decryptor {
         force: bool,
     ) -> Result<(), QlockError> {
         let all_files = FileUtils::collect_files(&files)?;
-        let qlock_files: Vec<_> = all_files.iter()
+        let qlock_files: Vec<_> = all_files
+            .iter()
             .filter(|f| f.extension().map_or(false, |ext| ext == "qlock"))
             .collect();
         let total_files = qlock_files.len();
@@ -364,14 +377,7 @@ impl Decryptor {
                 outputs.clone()
             };
 
-            self.decrypt_key_and_file(
-                file,
-                outputs.clone(),
-                password,
-                force,
-                idx,
-                total_files,
-            )?;
+            self.decrypt_key_and_file(file, outputs.clone(), password, force, idx, total_files)?;
         }
 
         Ok(())

@@ -65,6 +65,21 @@ qlock -d file1.qlock file2.qlock \
   -o "decrypted1.txt, decrypted2.txt"
 ```
 
+### Preview the order of files when encrypting/decrypting with a directory
+
+> Shows a numbered list of files, so you can confidently map comma-separated lists or numered parameters to each file within a folder, recursively
+
+```bash
+qlock preview enc <folder>
+qlock preview dec <folder>
+
+# Example output:
+# 1. path/file1.md
+# 2. path/file2.md
+# 3. path/nested/file3.md
+# etc...
+```
+
 ### Directory Encryption with per-file flags
 
 ```bash

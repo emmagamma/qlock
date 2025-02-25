@@ -1,3 +1,4 @@
+use crate::qlock_errors::QlockError;
 use std::fs;
 use std::io::{self};
 use std::path::{Path, PathBuf};
@@ -67,5 +68,47 @@ impl FileUtils {
         }
 
         Ok(all_files)
+    }
+
+    pub fn preview_files(folder: &PathBuf, is_encrypt: bool) -> Result<(), QlockError> {
+        let all_files = FileUtils::collect_files(&[folder.clone()])?;
+        let filtered_files: Vec<_> = if is_encrypt {
+            all_files
+                .into_iter()
+                .filter(|f| {
+                    !f.extension().map_or(false, |ext| ext == "qlock")
+                        && !f
+                            .file_name()
+                            .map_or(false, |fname| fname == "qlock_metadata.json")
+                })
+                .collect()
+        } else {
+            all_files
+                .into_iter()
+                .filter(|f| f.extension().map_or(false, |ext| ext == "qlock"))
+                .collect()
+        };
+
+        if filtered_files.is_empty() {
+            println!(
+                "No files found in {} for the specified mode.",
+                folder.display()
+            );
+            return Ok(());
+        }
+
+        println!(
+            "Previewing files for {}:",
+            if is_encrypt {
+                "encryption"
+            } else {
+                "decryption"
+            }
+        );
+        for (index, file) in filtered_files.iter().enumerate() {
+            println!("{}. {}", index + 1, file.display());
+        }
+
+        Ok(())
     }
 }

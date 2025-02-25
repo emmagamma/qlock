@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use qlock::crypto_utils::{Decryptor, Encryptor};
 use qlock::metadata_manager::MetadataManager;
 use qlock::qlock_errors::QlockError;
+use qlock::file_utils::FileUtils;
 
 #[derive(Parser)]
 #[command(
@@ -111,6 +112,15 @@ enum Commands {
         #[arg(value_parser = clap::value_parser!(String))]
         key_name: Option<String>,
     },
+    /// Preview the order that files will be processed in, during encryption or decryption with a given folder
+    Preview {
+        /// Specify `enc` or `dec` to preview file order for encryption or decryption with a given folder
+        #[arg(value_parser = clap::value_parser!(String))]
+        mode: String,
+        /// Path to the folder you want to preview
+        #[arg(value_parser = clap::value_parser!(PathBuf))]
+        folder: PathBuf,
+    },
 }
 
 fn main() -> Result<(), QlockError> {
@@ -129,6 +139,22 @@ fn main() -> Result<(), QlockError> {
             } else {
                 if let Err(e) = MetadataManager.remove_metadata(&key_name.unwrap()) {
                     eprintln!("{}", e.to_string());
+                }
+            }
+            return Ok(());
+        }
+        Some(Commands::Preview { mode, folder }) => {
+            if !folder.is_dir() {
+                eprintln!("The specified path is not a directory.");
+                std::process::exit(1);
+            }
+            match mode.as_str() {
+                "enc" => FileUtils::preview_files(&folder, true)?,
+                "dec" => FileUtils::preview_files(&folder, false)?,
+                _ => {
+                    eprintln!("Specify either 'enc' or 'dec' for the preview mode.");
+                    println!("(Or try `qlock preview --help` for more info)");
+                    std::process::exit(1);
                 }
             }
             return Ok(());
