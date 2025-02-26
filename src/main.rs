@@ -2,9 +2,9 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 use qlock::crypto_utils::{Decryptor, Encryptor};
+use qlock::file_utils::FileUtils;
 use qlock::metadata_manager::MetadataManager;
 use qlock::qlock_errors::QlockError;
-use qlock::file_utils::FileUtils;
 
 #[derive(Parser)]
 #[command(
@@ -60,7 +60,9 @@ struct ActionArgs {
         short = 'p',
         long = "password",
         required = false,
-        value_parser = parse_passwords
+        value_parser = parse_numbered_or_list,
+        value_delimiter = ',',
+        num_args = 1..,
     )]
     password: Vec<String>,
 
@@ -70,7 +72,14 @@ struct ActionArgs {
     /// 1. A single string: -o "encrypted"
     /// 2. A comma-separated list: -o "enc1, enc2, enc3"
     /// 3. Numbered flags: -o1="enc1" -o2="enc2" -o3="enc3"
-    #[arg(short = 'o', long = "output", required = false, value_delimiter = ',')]
+    #[arg(
+        short = 'o',
+        long = "output",
+        required = false,
+        value_delimiter = ',',
+        value_parser = parse_numbered_or_list,
+        num_args = 1..,
+    )]
     output: Vec<String>,
 
     /// Name(s) for encrypted keys.
@@ -79,7 +88,14 @@ struct ActionArgs {
     /// 1. A single string: -n "name"
     /// 2. A comma-separated list: -n "name1, name2, name3"
     /// 3. Numbered flags: -n1="name1" -n2="name2" -n3="name3"
-    #[arg(short = 'n', long = "name", required = false, value_delimiter = ',')]
+    #[arg(
+        short = 'n',
+        long = "name",
+        required = false,
+        value_delimiter = ',',
+        value_parser = parse_numbered_or_list,
+        num_args = 1..,
+    )]
     name: Vec<String>,
 
     /// (Optional) skip the prompt for a key name and auto-generate one instead. Only with -e or
@@ -94,8 +110,26 @@ struct ActionArgs {
     force: bool,
 }
 
-fn parse_passwords(input: &str) -> Result<String, String> {
-    Ok(input.to_string())
+fn parse_numbered_or_list(input: &str) -> Result<String, String> {
+    // Check if this is a numbered flag by looking for number prefix
+    let prefix_pattern = format!(
+        "{}{}",
+        input.chars().next().unwrap_or('_'), // First char
+        input.chars().nth(1).unwrap_or('_')  // Second char
+    );
+
+    match prefix_pattern.as_str() {
+        // Match patterns like p1=, n2=, o3= at start of input
+        s if s.chars().next().unwrap().is_ascii_digit() && s.chars().nth(1).unwrap() == '=' => {
+            Ok(input
+                .split_once('=')
+                .map(|(_, v)| v)
+                .unwrap_or(input)
+                .to_string())
+        }
+        // Otherwise treat as regular input (comma-separated list or single value)
+        _ => Ok(input.to_string()),
+    }
 }
 
 #[derive(Subcommand)]

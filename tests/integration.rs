@@ -8,7 +8,7 @@ mod tests {
     };
 
     #[test]
-    fn test_encrypt_and_decrypt_one_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_encrypt_decrypt_one_file() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(&[("test.txt", "Lorem ipsum and so forth...")], &[])?;
 
         let encrypt_args = &["-e", "test.txt", "-p", "sixteenCharsPlus1", "-af"];
@@ -28,7 +28,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_and_decrypt_multiple_files() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_encrypt_decrypt_multiple_files() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("test/zero.md", "0000"),
@@ -77,7 +77,8 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_and_decrypt_multiple_files_with_one_output() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_encrypt_decrypt_multiple_files_with_one_output(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("test/zero.md", "0000"),
@@ -146,18 +147,12 @@ mod tests {
             "test/one.md",
             "test/nested/two.md",
             "test/nested/three.md",
-            "-p",
-            "sixteenCharsPlus1",
-            "-p",
-            "sixteenCharsPlus2",
-            "-p",
-            "sixteenCharsPlus3",
-            "-o",
-            "output1",
-            "-o",
-            "output2",
-            "-o",
-            "output3",
+            "-p1=sixteenCharsPlus1",
+            "-p2=sixteenCharsPlus2",
+            "-p3=sixteenCharsPlus3",
+            "-o1=output1",
+            "-o2=output2",
+            "-o3=output3",
             "-af",
         ];
         let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
@@ -172,18 +167,12 @@ mod tests {
             "output1.qlock",
             "output2.qlock",
             "output3.qlock",
-            "-p",
-            "sixteenCharsPlus1",
-            "-p",
-            "sixteenCharsPlus2",
-            "-p",
-            "sixteenCharsPlus3",
-            "-o",
-            "decrypted1",
-            "-o",
-            "decrypted2",
-            "-o",
-            "decrypted3",
+            "-p1=sixteenCharsPlus1",
+            "-p2=sixteenCharsPlus2",
+            "-p3=sixteenCharsPlus3",
+            "-o1=decrypted1",
+            "-o2=decrypted2",
+            "-o3=decrypted3",
             "-f",
         ];
         let decrypt_output = execute_qlock_command(&temp_dir, decrypt_args)?;
@@ -200,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_and_decrypt_directory() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_encrypt_decrypt_directory() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("dir/file1.txt", "Content of file 1"),
@@ -280,6 +269,89 @@ mod tests {
         assert_file_exists(&temp_dir, "decrypted2.txt");
         assert_file_contents(&temp_dir, "decrypted1.txt", "Content of file 1")?;
         assert_file_contents(&temp_dir, "decrypted2.txt", "Content of file 2")?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ls_command_with_no_metadata() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = setup_test_directory(&[], &[])?;
+        let ls_args = &["ls"];
+        let ls_output = execute_qlock_command(&temp_dir, ls_args)?;
+        assert_command_success(&ls_output);
+        assert!(String::from_utf8_lossy(&ls_output.stdout)
+            .contains("qlock_metadata.json does not exist"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ls_command_with_metadata() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = setup_test_directory(
+            &[
+                ("dir/file1.txt", "Content of file 1"),
+                ("dir/file2.txt", "Content of file 2"),
+            ],
+            &["dir"],
+        )?;
+
+        let encrypt_args = &[
+            "-e",
+            "dir/",
+            "-p",
+            "sixteenCharsPlus1, sixteenCharsPlus2",
+            "-o",
+            "dir/output1, dir/output2",
+            "-af",
+        ];
+        let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
+        assert_command_success(&encrypt_output);
+        assert!(String::from_utf8_lossy(&encrypt_output.stdout).contains("data was written to"));
+        assert_file_exists(&temp_dir, "dir/output1.qlock");
+        assert_file_exists(&temp_dir, "dir/output2.qlock");
+
+        let ls_args = &["ls"];
+        let ls_output = execute_qlock_command(&temp_dir, ls_args)?;
+        assert_command_success(&ls_output);
+        assert!(String::from_utf8_lossy(&ls_output.stdout).contains("1."));
+        assert!(String::from_utf8_lossy(&ls_output.stdout).contains("2."));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ls_command_with_key_name() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = setup_test_directory(
+            &[
+                ("dir/file1.txt", "Content of file 1"),
+                ("dir/file2.txt", "Content of file 2"),
+            ],
+            &["dir"],
+        )?;
+
+        let encrypt_args = &[
+            "-e",
+            "dir/",
+            "-p",
+            "sixteenCharsPlus1, sixteenCharsPlus2",
+            "-o",
+            "dir/output1, dir/output2",
+            "-n",
+            "key1, key2",
+            "-f",
+        ];
+        let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
+        assert_command_success(&encrypt_output);
+        assert!(String::from_utf8_lossy(&encrypt_output.stdout).contains("data was written to"));
+        assert_file_exists(&temp_dir, "dir/output1.qlock");
+        assert_file_exists(&temp_dir, "dir/output2.qlock");
+
+        let ls_args = &["ls", "key2"];
+        let ls_output = execute_qlock_command(&temp_dir, ls_args)?;
+        println!("{}", String::from_utf8_lossy(&ls_output.stdout));
+        assert_command_success(&ls_output);
+        assert!(String::from_utf8_lossy(&ls_output.stdout).contains("2. name: key2"));
+        assert!(!String::from_utf8_lossy(&ls_output.stdout).contains("1. name: key1"));
 
         Ok(())
     }
