@@ -274,6 +274,90 @@ mod tests {
     }
 
     #[test]
+    fn test_encrypt_decrypt_with_commas_in_passwords() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = setup_test_directory(
+            &[
+                ("dir/file1.txt", "Content of file 1"),
+                ("dir/file2.txt", "Content of file 2"),
+            ],
+            &["dir"],
+        )?;
+
+        // First test: comma-separated list with escaped commas
+        let encrypt_args = &[
+            "-e",
+            "dir/",
+            "-p",
+            r#"sixteenChars\,With\,Commas1, sixteenChars\,With\,Commas2"#,
+            "-o",
+            "dir/output1, dir/output2",
+            "-af",
+        ];
+        let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
+        assert_command_success(&encrypt_output);
+        assert!(String::from_utf8_lossy(&encrypt_output.stdout).contains("data was written to"));
+        assert_file_exists(&temp_dir, "dir/output1.qlock");
+        assert_file_exists(&temp_dir, "dir/output2.qlock");
+
+        let decrypt_args = &[
+            "-d",
+            "dir/",
+            "-p",
+            r#"sixteenChars\,With\,Commas1, sixteenChars\,With\,Commas2"#,
+            "-o",
+            "decrypted1, decrypted2",
+            "-f",
+        ];
+        let decrypt_output = execute_qlock_command(&temp_dir, decrypt_args)?;
+        assert_command_success(&decrypt_output);
+        assert!(String::from_utf8_lossy(&decrypt_output.stdout).contains("data was written to"));
+        assert_file_exists(&temp_dir, "decrypted1.txt");
+        assert_file_exists(&temp_dir, "decrypted2.txt");
+        assert_file_contents(&temp_dir, "decrypted1.txt", "Content of file 1")?;
+        assert_file_contents(&temp_dir, "decrypted2.txt", "Content of file 2")?;
+
+        // Clean up first test files
+        std::fs::remove_file(temp_dir.path().join("dir/output1.qlock"))?;
+        std::fs::remove_file(temp_dir.path().join("dir/output2.qlock"))?;
+        std::fs::remove_file(temp_dir.path().join("qlock_metadata.json"))?;
+
+        // Second test: numbered flags with raw commas
+        let encrypt_args_numbered = &[
+            "-e",
+            "dir/",
+            "-p1=sixteenChars,With,Commas1",
+            "-p2=sixteenChars,With,Commas2",
+            "-o1=dir/output1",
+            "-o2=dir/output2",
+            "-af",
+        ];
+        let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args_numbered)?;
+        assert_command_success(&encrypt_output);
+        assert!(String::from_utf8_lossy(&encrypt_output.stdout).contains("data was written to"));
+        assert_file_exists(&temp_dir, "dir/output1.qlock");
+        assert_file_exists(&temp_dir, "dir/output2.qlock");
+
+        let decrypt_args_numbered = &[
+            "-d",
+            "dir/",
+            "-p1=sixteenChars,With,Commas1",
+            "-p2=sixteenChars,With,Commas2",
+            "-o1=decrypted1",
+            "-o2=decrypted2",
+            "-f",
+        ];
+        let decrypt_output = execute_qlock_command(&temp_dir, decrypt_args_numbered)?;
+        assert_command_success(&decrypt_output);
+        assert!(String::from_utf8_lossy(&decrypt_output.stdout).contains("data was written to"));
+        assert_file_exists(&temp_dir, "decrypted1.txt");
+        assert_file_exists(&temp_dir, "decrypted2.txt");
+        assert_file_contents(&temp_dir, "decrypted1.txt", "Content of file 1")?;
+        assert_file_contents(&temp_dir, "decrypted2.txt", "Content of file 2")?;
+
+        Ok(())
+    }
+
+    #[test]
     fn test_ls_command_with_no_metadata() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(&[], &[])?;
         let ls_args = &["ls"];
@@ -348,7 +432,6 @@ mod tests {
 
         let ls_args = &["ls", "key2"];
         let ls_output = execute_qlock_command(&temp_dir, ls_args)?;
-        println!("{}", String::from_utf8_lossy(&ls_output.stdout));
         assert_command_success(&ls_output);
         assert!(String::from_utf8_lossy(&ls_output.stdout).contains("2. name: key2"));
         assert!(!String::from_utf8_lossy(&ls_output.stdout).contains("1. name: key1"));

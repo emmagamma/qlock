@@ -61,7 +61,6 @@ struct ActionArgs {
         long = "password",
         required = false,
         value_parser = parse_numbered_or_list,
-        value_delimiter = ',',
         num_args = 1..,
     )]
     password: Vec<String>,
