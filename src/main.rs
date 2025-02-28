@@ -207,6 +207,7 @@ fn main() -> Result<(), QlockError> {
                     action.force,
                 ) {
                     eprintln!("{}", e.to_string());
+                    std::process::exit(1);
                 }
             }
             (false, true) => {
@@ -224,6 +225,7 @@ fn main() -> Result<(), QlockError> {
                     action.force,
                 ) {
                     eprintln!("{}", e.to_string());
+                    std::process::exit(1);
                 }
             }
             _ => {

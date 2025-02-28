@@ -30,6 +30,19 @@ pub fn execute_qlock_command(
     Ok(cmd.assert().get_output().to_owned())
 }
 
+pub fn execute_qlock_command_with_stdin(
+    temp_dir: &TempDir,
+    args: &[&str],
+    stdin: &str,
+) -> Result<std::process::Output, Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("qlock")?;
+    cmd.current_dir(temp_dir.path());
+    cmd.args(args);
+    cmd.write_stdin(stdin);
+
+    Ok(cmd.assert().get_output().to_owned())
+}
+
 pub fn assert_command_success(output: &std::process::Output) {
     assert!(output.status.success());
 }

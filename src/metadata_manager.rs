@@ -88,14 +88,21 @@ impl MetadataManager {
                     println!("No encrypted keys were found in {}.", Self::METADATA_FILE);
                     return;
                 }
+                let mut was_found = false;
                 for (index, datum) in saved_data.data.iter().enumerate() {
                     if key_name.is_some() {
                         if datum.name == key_name.clone().unwrap() {
+                            was_found = true;
                             self.print_one_key(index, datum, width);
                         }
                     } else {
                         self.print_one_key(index, datum, width);
                     }
+                }
+
+                if !was_found && key_name.is_some() {
+                    eprintln!("No encrypted key with name '{}' was found in {}.", key_name.unwrap(), Self::METADATA_FILE);
+                    std::process::exit(1);
                 }
             }
             Err(e) => println!("Error reading metadata: {}", e),
