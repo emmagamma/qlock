@@ -8,7 +8,7 @@ mod tests {
     };
 
     #[test]
-    fn test_encrypt_decrypt_one_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn encrypt_decrypt_one_file() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(&[("test.txt", "Lorem ipsum and so forth...")], &[])?;
 
         let encrypt_args = &["-e", "test.txt", "-p", "sixteenCharsPlus1", "-af"];
@@ -28,7 +28,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt_multiple_files() -> Result<(), Box<dyn std::error::Error>> {
+    fn encrypt_decrypt_multiple_files() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("test/zero.md", "0000"),
@@ -77,7 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt_multiple_files_with_one_output(
+    fn encrypt_decrypt_multiple_files_with_one_output(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt_multiple_files_with_multiple_outputs(
+    fn encrypt_decrypt_multiple_files_with_multiple_outputs(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt_directory() -> Result<(), Box<dyn std::error::Error>> {
+    fn encrypt_decrypt_directory() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("dir/file1.txt", "Content of file 1"),
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt_directory_with_multiple_outputs(
+    fn encrypt_decrypt_directory_with_multiple_outputs(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
@@ -274,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt_with_commas_in_passwords() -> Result<(), Box<dyn std::error::Error>> {
+    fn encrypt_decrypt_with_commas_in_passwords() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("dir/file1.txt", "Content of file 1"),
@@ -358,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ls_command_with_no_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    fn ls_command_with_no_metadata() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(&[], &[])?;
         let ls_args = &["ls"];
         let ls_output = execute_qlock_command(&temp_dir, ls_args)?;
@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ls_command_with_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    fn ls_command_with_metadata() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("dir/file1.txt", "Content of file 1"),
@@ -404,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ls_command_with_key_name() -> Result<(), Box<dyn std::error::Error>> {
+    fn ls_command_with_key_name() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("dir/file1.txt", "Content of file 1"),
