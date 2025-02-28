@@ -104,7 +104,7 @@ struct ActionArgs {
     #[arg(short = 'a', long = "auto-name", required = false)]
     auto_name: bool,
 
-    /// (Optional) when provided, will skip (y/n) prompts and automatically overwrite existing files and simply overwrite them
+    /// (Optional) when provided, will skip (y/n) prompts and automatically overwrite existing files
     #[arg(short = 'f', long = "force-overwrite", required = false)]
     force: bool,
 }
