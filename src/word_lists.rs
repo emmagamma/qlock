@@ -1,5 +1,5 @@
 use rand::seq::SliceRandom;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 
 pub const NOUNS: &[&str] = &[
     "boop", "doodle", "puddle", "quack", "muffin", "goober", "snoot", "giggle", "bop", "whisker",

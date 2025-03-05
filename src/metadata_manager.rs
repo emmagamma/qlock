@@ -2,7 +2,7 @@ use std::{fs, io, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use terminal_size::{terminal_size, Width};
+use terminal_size::{Width, terminal_size};
 use textwrap;
 
 use crate::qlock_errors::QlockError;
@@ -72,7 +72,10 @@ impl MetadataManager {
 
     pub fn list(&self, key_name: Option<String>) {
         if !Path::new(Self::METADATA_FILE).exists() {
-            println!("{} does not exist, try encrypting something first or make sure you're in the correct directory.", Self::METADATA_FILE);
+            println!(
+                "{} does not exist, try encrypting something first or make sure you're in the correct directory.",
+                Self::METADATA_FILE
+            );
             return;
         }
 
@@ -101,7 +104,11 @@ impl MetadataManager {
                 }
 
                 if !was_found && key_name.is_some() {
-                    eprintln!("No encrypted key with name '{}' was found in {}.", key_name.unwrap(), Self::METADATA_FILE);
+                    eprintln!(
+                        "No encrypted key with name '{}' was found in {}.",
+                        key_name.unwrap(),
+                        Self::METADATA_FILE
+                    );
                     std::process::exit(1);
                 }
             }
@@ -125,7 +132,7 @@ impl MetadataManager {
         );
         pretty_print_vec("encrypted key: ", &datum.key, 2, width);
         pretty_print_vec("hash of encrypted file: ", &datum.hash, 2, width);
-        println!("");
+        println!();
     }
 
     pub fn remove_metadata(&self, name: &str) -> Result<bool, QlockError> {

@@ -54,8 +54,8 @@ struct ActionArgs {
     /// Can be specified as:
     /// 1. A single string: -p "password"
     /// 2. A comma-separated list: -p "pass1, pass2, pass3"
-    /// (To include commas in a password, just escape them: `-p "pass1, pass2\,With\,Commas, pass3"`)
     /// 3. Numbered flags: -p1="pass1" -p2="pass2" -p3="pass3"
+    ///    (To include commas in a password, just escape them: `-p "pass1, pass2\,With\,Commas, pass3"`)
     #[arg(
         short = 'p',
         long = "password",
@@ -169,10 +169,8 @@ fn main() -> Result<(), QlockError> {
                 eprintln!("Please specify the name of an encrypted key to remove...");
                 println!("(try `qlock ls` to see them all)");
                 std::process::exit(1);
-            } else {
-                if let Err(e) = MetadataManager.remove_metadata(&key_name.unwrap()) {
-                    eprintln!("{}", e.to_string());
-                }
+            } else if let Err(e) = MetadataManager.remove_metadata(&key_name.unwrap()) {
+                eprintln!("{}", e);
             }
             return Ok(());
         }
@@ -206,7 +204,7 @@ fn main() -> Result<(), QlockError> {
                     action.auto_name,
                     action.force,
                 ) {
-                    eprintln!("{}", e.to_string());
+                    eprintln!("{}", e);
                     std::process::exit(1);
                 }
             }
@@ -224,7 +222,7 @@ fn main() -> Result<(), QlockError> {
                     action.password,
                     action.force,
                 ) {
-                    eprintln!("{}", e.to_string());
+                    eprintln!("{}", e);
                     std::process::exit(1);
                 }
             }

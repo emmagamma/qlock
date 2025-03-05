@@ -77,8 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_decrypt_multiple_files_with_one_output(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn encrypt_decrypt_multiple_files_with_one_output() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("test/zero.md", "0000"),
@@ -131,8 +130,8 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_decrypt_multiple_files_with_multiple_outputs(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn encrypt_decrypt_multiple_files_with_multiple_outputs()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("test/one.md", "File Contents 1"),
@@ -228,8 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_decrypt_directory_with_multiple_outputs(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn encrypt_decrypt_directory_with_multiple_outputs() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
                 ("dir/file1.txt", "Content of file 1"),
@@ -361,14 +359,18 @@ mod tests {
         let encrypt_args = &["-e", "test.txt", "-p", "sixteencharsplus1", "-af"];
         let output = execute_qlock_command(&temp_dir, encrypt_args)?;
         assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr)
-            .contains("Passwords should contain a mix of upper and lower case characters..."));
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("Passwords should contain a mix of upper and lower case characters...")
+        );
 
         let encrypt_args = &["-e", "test.txt", "-p", "Short1", "-af"];
         let output = execute_qlock_command(&temp_dir, encrypt_args)?;
         assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr)
-            .contains("Password was too short, it should be at least 16 characters long..."));
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("Password was too short, it should be at least 16 characters long...")
+        );
 
         Ok(())
     }
@@ -385,7 +387,10 @@ mod tests {
         )?;
 
         let encrypt_args = &[
-            "-e", "file1.txt", "file2.txt", "file3.txt",
+            "-e",
+            "file1.txt",
+            "file2.txt",
+            "file3.txt",
             "-p1=sixteenCharsPlus1",
             "-p2=sixteenCharsPlus2",
             "-p3=sixteenCharsPlus3",
@@ -411,7 +416,10 @@ mod tests {
         assert!(stdout.contains("key3"));
 
         let decrypt_args = &[
-            "-d", "out1.qlock", "out2.qlock", "out3.qlock",
+            "-d",
+            "out1.qlock",
+            "out2.qlock",
+            "out3.qlock",
             "-p1=sixteenCharsPlus1",
             "-p2=sixteenCharsPlus2",
             "-p3=sixteenCharsPlus3",
@@ -435,20 +443,19 @@ mod tests {
 
     #[test]
     fn encrypt_decrypt_with_mixed_flag_styles() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = setup_test_directory(
-            &[
-                ("file1.txt", "content1"),
-                ("file2.txt", "content2"),
-            ],
-            &[],
-        )?;
+        let temp_dir =
+            setup_test_directory(&[("file1.txt", "content1"), ("file2.txt", "content2")], &[])?;
 
         let encrypt_args = &[
-            "-e", "file1.txt", "file2.txt",
+            "-e",
+            "file1.txt",
+            "file2.txt",
             "-p1=sixteenCharsPlus1",
             "-p2=sixteenCharsPlus2",
-            "-o", "output1, output2",
-            "-n", "key1, key2",
+            "-o",
+            "output1, output2",
+            "-n",
+            "key1, key2",
             "-f",
         ];
         let output = execute_qlock_command(&temp_dir, encrypt_args)?;
@@ -458,7 +465,9 @@ mod tests {
         assert_file_exists(&temp_dir, "output2.qlock");
 
         let decrypt_args = &[
-            "-d", "output1.qlock", "output2.qlock",
+            "-d",
+            "output1.qlock",
+            "output2.qlock",
             "-p1=sixteenCharsPlus1",
             "-p2=sixteenCharsPlus2",
             "-o1=decrypted1",
@@ -497,8 +506,10 @@ mod tests {
         let ls_args = &["ls"];
         let ls_output = execute_qlock_command(&temp_dir, ls_args)?;
         assert_command_success(&ls_output);
-        assert!(String::from_utf8_lossy(&ls_output.stdout)
-            .contains("qlock_metadata.json does not exist"));
+        assert!(
+            String::from_utf8_lossy(&ls_output.stdout)
+                .contains("qlock_metadata.json does not exist")
+        );
 
         Ok(())
     }
@@ -596,7 +607,10 @@ mod tests {
         let rm_args = &["rm", "test-key"];
         let output = execute_qlock_command_with_stdin(&temp_dir, rm_args, "y\n")?;
         assert_command_success(&output);
-        assert!(String::from_utf8_lossy(&output.stdout).contains("Removed metadata for test-key from: ./qlock_metadata.json"));
+        assert!(
+            String::from_utf8_lossy(&output.stdout)
+                .contains("Removed metadata for test-key from: ./qlock_metadata.json")
+        );
 
         let ls_args = &["ls", "test-key"];
         let output = execute_qlock_command(&temp_dir, ls_args)?;

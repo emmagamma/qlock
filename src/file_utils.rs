@@ -24,16 +24,16 @@ impl FileUtils {
         operation: &str,
         force: bool,
     ) -> io::Result<()> {
-        if !force {
-            if path.exists() && !Self::prompt_for_overwrite(path, operation) {
-                println!(
-                    "{} not modified\n\n{} data was not output.",
-                    path.display(),
-                    operation
-                );
-                println!("If this was a mistake, you would need to run the command again and use `y` to overwrite the file.\n");
-                return Ok(());
-            }
+        if !force && path.exists() && !Self::prompt_for_overwrite(path, operation) {
+            println!(
+                "{} not modified\n\n{} data was not output.",
+                path.display(),
+                operation
+            );
+            println!(
+                "If this was a mistake, you would need to run the command again and use `y` to overwrite the file.\n"
+            );
+            return Ok(());
         }
         fs::write(path, contents)?;
         println!(
@@ -70,22 +70,21 @@ impl FileUtils {
         Ok(all_files)
     }
 
-    pub fn preview_files(folder: &PathBuf, is_encrypt: bool) -> Result<(), QlockError> {
-        let all_files = FileUtils::collect_files(&[folder.clone()])?;
+    pub fn preview_files(folder: &Path, is_encrypt: bool) -> Result<(), QlockError> {
+        let all_files = FileUtils::collect_files(&[folder.to_path_buf()])?;
         let filtered_files: Vec<_> = if is_encrypt {
             all_files
                 .into_iter()
                 .filter(|f| {
-                    !f.extension().map_or(false, |ext| ext == "qlock")
-                        && !f
-                            .file_name()
-                            .map_or(false, |fname| fname == "qlock_metadata.json")
+                    f.extension().is_none_or(|ext| ext != "qlock")
+                        && f.file_name()
+                            .is_none_or(|fname| fname != "qlock_metadata.json")
                 })
                 .collect()
         } else {
             all_files
                 .into_iter()
-                .filter(|f| f.extension().map_or(false, |ext| ext == "qlock"))
+                .filter(|f| f.extension().is_some_and(|ext| ext == "qlock"))
                 .collect()
         };
 

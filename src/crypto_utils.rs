@@ -2,8 +2,8 @@ use argon2::Algorithm::Argon2d;
 use argon2::Version::V0x13;
 use argon2::{Argon2, Params};
 use chacha20poly1305::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
     XChaCha20Poly1305, XNonce,
+    aead::{Aead, AeadCore, KeyInit, OsRng},
 };
 use rand::RngCore;
 use rpassword;
@@ -16,6 +16,17 @@ use crate::file_utils::FileUtils;
 use crate::metadata_manager::{EncryptedData, MetadataManager};
 use crate::qlock_errors::QlockError;
 use crate::word_lists::generate_random_name;
+
+pub struct EncryptionParams {
+    pub file_path: PathBuf,
+    pub output_flag: Vec<String>,
+    pub name_flag: Option<String>,
+    pub auto_name_flag: bool,
+    pub password_flag: Option<String>,
+    pub force_flag: bool,
+    pub file_index: usize,
+    pub file_total: usize,
+}
 
 pub struct CryptoUtils {
     argon_params: argon2::Params,
@@ -90,6 +101,12 @@ impl CryptoUtils {
     }
 }
 
+impl Default for CryptoUtils {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Encryptor {
     pub crypto_utils: CryptoUtils,
 }
@@ -107,16 +124,16 @@ impl Encryptor {
         outputs: Vec<String>,
         names: Vec<String>,
         passwords: Vec<String>,
-        auto_gen_name: bool,
-        force: bool,
+        auto_name_flag: bool,
+        force_flag: bool,
     ) -> Result<(), QlockError> {
         let all_files = FileUtils::collect_files(&files)?;
         let filtered_files: Vec<_> = all_files
             .iter()
-            .filter(|f| f.extension().map_or(false, |ext| ext != "qlock"))
+            .filter(|f| f.extension().is_some_and(|ext| ext != "qlock"))
             .filter(|f| {
                 f.file_name()
-                    .map_or(false, |fname| fname != "qlock_metadata.json")
+                    .is_some_and(|fname| fname != "qlock_metadata.json")
             })
             .collect();
 
@@ -125,113 +142,105 @@ impl Encryptor {
             return Ok(());
         }
 
-        let total_files = filtered_files.len();
-
+        let file_total = filtered_files.len();
         let passwords = CryptoUtils::parse_passwords(&passwords);
-
         let names: Vec<_> = names.iter().map(|s| s.trim().to_string()).collect();
 
-        for (idx, file) in filtered_files.iter().enumerate() {
-            let password = passwords.get(idx).cloned();
-            let name = names.get(idx).cloned();
+        for (file_index, file) in filtered_files.iter().enumerate() {
+            let password_flag = passwords.get(file_index).cloned();
+            let name_flag = names.get(file_index).cloned();
 
-            self.encrypt_file_and_key(
-                file,
-                &outputs,
-                name,
-                auto_gen_name,
-                password,
-                force,
-                idx,
-                total_files,
-            )?;
+            self.encrypt_file_and_key(EncryptionParams {
+                file_path: file.to_path_buf(),
+                output_flag: outputs.clone(),
+                name_flag,
+                auto_name_flag,
+                password_flag,
+                force_flag,
+                file_index,
+                file_total,
+            })?;
         }
 
         Ok(())
     }
 
-    pub fn encrypt_file_and_key(
-        &self,
-        file_path: &PathBuf,
-        output_path: &[String],
-        name: Option<String>,
-        auto_gen_name: bool,
-        password_flag: Option<String>,
-        force: bool,
-        idx: usize,
-        total_files: usize,
-    ) -> Result<(), QlockError> {
-        println!("Encrypting file: {}", file_path.to_str().unwrap());
-        let contents = fs::read(file_path).map_err(QlockError::IoError);
-        if let Err(e) = contents {
-            return Err(e);
-        }
-
-        let key_name = self.get_key_name(name, auto_gen_name);
-        if let Err(e) = key_name {
-            return Err(e);
-        }
+    pub fn encrypt_file_and_key(&self, params: EncryptionParams) -> Result<(), QlockError> {
+        println!("Encrypting file: {}", params.file_path.to_str().unwrap());
+        let contents = fs::read(&params.file_path).map_err(QlockError::IoError)?;
+        let key_name = self.get_key_name(params.name_flag, params.auto_name_flag)?;
 
         let password;
-
-        if let Some(pf) = password_flag {
+        if let Some(pf) = params.password_flag {
             if validate_password(&pf) {
                 password = pf;
             } else {
                 std::process::exit(1);
             }
         } else {
-            password = self.get_encryption_password_with("Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: ")?;
+            password = self.get_encryption_password_with(
+                "Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: "
+            )?;
         }
 
         println!("Generating a random key and encrypting your data...");
-        let (ciphertext, nonce_a, og_key) = self.encrypt_file_contents(&contents?)?;
-        let output_path = self.determine_output_path(file_path, output_path, idx, total_files);
+        let (ciphertext, nonce_a, og_key) = self.encrypt_file_contents(&contents)?;
+        let output_path = self.determine_output_path(
+            &params.file_path,
+            &params.output_flag,
+            params.file_index,
+            params.file_total,
+        );
 
         println!("Generating a password-derived key to encrypt the first key with...");
-        let (encrypted_key, nonce_b, salt_a) = self.encrypt_key(&password, &og_key.to_vec())?;
+        let (encrypted_key, nonce_b, salt_a) = self.encrypt_key(&password, &og_key)?;
         let salt_b = self.crypto_utils.generate_salt();
         let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &salt_b)?;
 
         let metadata = EncryptedData {
-            name: key_name?,
+            name: key_name,
             key: encrypted_key,
             hash: hash_bytes.to_vec(),
             nonce_a: nonce_a.to_vec(),
             nonce_b: nonce_b.to_vec(),
             salt_a: salt_a.to_vec(),
             salt_b: salt_b.to_vec(),
-            input_filename: file_path.to_string_lossy().to_string(),
+            input_filename: params.file_path.to_string_lossy().to_string(),
             output_filename: output_path.to_string_lossy().to_string(),
         };
 
         MetadataManager
             .write(metadata)
             .map_err(QlockError::IoError)?;
-        FileUtils::write_with_confirmation(&output_path, &ciphertext, "Encrypted", force)
-            .map_err(QlockError::IoError)
+        FileUtils::write_with_confirmation(
+            &output_path,
+            &ciphertext,
+            "Encrypted",
+            params.force_flag,
+        )
+        .map_err(QlockError::IoError)
     }
 
     pub fn get_key_name(
         &self,
-        provided_name: Option<String>,
-        auto_gen_name: bool,
+        name_flag: Option<String>,
+        auto_name_flag: bool,
     ) -> Result<String, QlockError> {
-        if !provided_name.is_none() {
-            if MetadataManager.key_name_already_exists(&provided_name.clone().unwrap()) {
-                return Err(QlockError::KeyAlreadyExists(provided_name.unwrap()));
+        if let Some(name) = name_flag {
+            if MetadataManager.key_name_already_exists(&name) {
+                return Err(QlockError::KeyAlreadyExists(name));
             } else {
-                if auto_gen_name {
+                if auto_name_flag {
                     println!(
                         "-a (--auto-name) is ignored because -n (--name) is already specified"
                     );
                 }
-                println!("Using key name: {}", provided_name.clone().unwrap());
-                return Ok(provided_name.unwrap());
+                println!("Using key name: {}", name);
+                return Ok(name);
             }
-        }
+        };
 
-        if auto_gen_name {
+        if auto_name_flag {
             let name = generate_random_name();
             println!("Auto-generated name: {}", name);
             return Ok(name);
@@ -259,12 +268,12 @@ impl Encryptor {
     }
 
     pub fn get_encryption_password_with(&self, prompt: &str) -> Result<String, QlockError> {
-        let pass = rpassword::prompt_password(prompt).map_err(|e| QlockError::IoError(e))?;
+        loop {
+            let pass = rpassword::prompt_password(prompt).map_err(QlockError::IoError)?;
 
-        if validate_password(&pass) {
-            Ok(pass)
-        } else {
-            self.get_encryption_password_with("Create a new password: ")
+            if validate_password(&pass) {
+                return Ok(pass);
+            }
         }
     }
 
@@ -285,22 +294,22 @@ impl Encryptor {
 
     pub fn determine_output_path(
         &self,
-        file_path: &PathBuf,
-        outputs: &[String],
-        idx: usize,
-        total_files: usize,
+        file_path: &Path,
+        output_flags: &[String],
+        file_index: usize,
+        file_total: usize,
     ) -> PathBuf {
         let parent_dir = file_path.parent().unwrap().to_string_lossy().to_string();
         let stem = file_path.file_stem().unwrap().to_str().unwrap().to_string();
 
-        match outputs {
+        match output_flags {
             // Single output with multiple files - add counter to all files
-            outputs if outputs.len() == 1 && total_files > 1 => {
-                PathBuf::from(format!("{}-{:04}.qlock", outputs[0].trim(), idx))
+            outputs if outputs.len() == 1 && file_total > 1 => {
+                PathBuf::from(format!("{}-{:04}.qlock", outputs[0].trim(), file_index))
             }
             // Multiple outputs specified - use corresponding output or fall back to original filename
             outputs if !outputs.is_empty() => {
-                if let Some(output) = outputs.get(idx) {
+                if let Some(output) = outputs.get(file_index) {
                     PathBuf::from(format!("{}.qlock", output.trim()))
                 } else {
                     // More files than outputs - fall back to original filename
@@ -341,6 +350,12 @@ impl Encryptor {
     }
 }
 
+impl Default for Encryptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Decryptor {
     pub crypto_utils: CryptoUtils,
 }
@@ -362,7 +377,7 @@ impl Decryptor {
         let all_files = FileUtils::collect_files(&files)?;
         let qlock_files: Vec<_> = all_files
             .iter()
-            .filter(|f| f.extension().map_or(false, |ext| ext == "qlock"))
+            .filter(|f| f.extension().is_some_and(|ext| ext == "qlock"))
             .collect();
         let total_files = qlock_files.len();
 
@@ -508,6 +523,12 @@ impl Decryptor {
         };
 
         path
+    }
+}
+
+impl Default for Decryptor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

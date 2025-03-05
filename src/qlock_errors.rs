@@ -24,7 +24,11 @@ impl std::fmt::Display for QlockError {
             QlockError::DecryptionError(msg) => write!(f, "Decryption error: {}", msg),
             QlockError::KeyDerivationError(msg) => write!(f, "Key derivation error: {}", msg),
             QlockError::MetadataNotFound(msg) => write!(f, "Metadata not found for: {}", msg),
-            QlockError::KeyAlreadyExists(msg) => write!(f, "A key named '{}' already exists, please choose a different name...", msg),
+            QlockError::KeyAlreadyExists(msg) => write!(
+                f,
+                "A key named '{}' already exists, please choose a different name...",
+                msg
+            ),
         }
     }
 }
