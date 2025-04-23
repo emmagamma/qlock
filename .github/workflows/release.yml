@@ -41,11 +41,19 @@ jobs:
           cp target/${{ matrix.target }}/release/qlock dist/${BIN}
           tar -C dist -czf dist/${BIN}.tar.gz ${BIN}
 
-      - name: Upload artifacts
+      - name: Upload Intel artifact
+        if: matrix.target == 'x86_64-apple-darwin'
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ github.run_id }}-${{ matrix.target }}
-          path: dist/*.tar.gz
+          name: qlock-darwin-x86_64
+          path: dist/qlock-x86_64-apple-darwin.tar.gz
+
+      - name: Upload ARM artifact
+        if: matrix.target == 'aarch64-apple-darwin'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qlock-darwin-arm
+          path: dist/qlock-aarch64-apple-darwin.tar.gz
 
   upload:
     name: Publish Release Assets
@@ -53,13 +61,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout for context
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
+      - name: Download Intel artifact
         uses: actions/download-artifact@v4
         with:
-          name: dist-${{ github.run_id }}-${{ matrix.target }}
+          name: qlock-darwin-x86_64
+          path: dist
+
+      - name: Download ARM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: qlock-darwin-arm
           path: dist
 
       - name: Create / Update GitHub Release
