@@ -3,7 +3,7 @@ name: Build and Release qlock
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   build-macos:
@@ -44,7 +44,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-${{ github.run_id }}
           path: dist/*.tar.gz
 
   upload:
@@ -59,7 +59,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
         with:
-          name: dist
+          name: dist-${{ github.run_id }}
           path: dist
 
       - name: Create / Update GitHub Release
