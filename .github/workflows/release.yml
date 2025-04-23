@@ -40,9 +40,10 @@ jobs:
       - name: Package macOS artifact for ${{ matrix.target }}
         run: |
           mkdir -p dist
-          BIN=qlock-${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/qlock dist/${BIN}
-          tar -C dist -czf dist/${BIN}.tar.gz ${BIN}
+          ARCH=$(echo "${{ matrix.target }}" | sed -E 's/aarch64/ARM/; s/-apple-darwin//')
+          OUTNAME="qlock-darwin-${ARCH}"
+          cp target/${{ matrix.target }}/release/qlock dist/${OUTNAME}
+          tar -C dist -czf dist/${OUTNAME}.tar.gz ${OUTNAME}
 
       - name: Upload Intel artifact
         if: matrix.target == 'x86_64-apple-darwin'
@@ -56,7 +57,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: qlock-darwin-arm
-          path: dist/qlock-darwin-arm.tar.gz
+          path: dist/qlock-darwin-ARM.tar.gz
 
   upload:
     name: Publish Release Assets
