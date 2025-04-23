@@ -1,0 +1,38 @@
+name: Build and Release qlock
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        platform:
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Build binary
+        run: |
+          cargo build --release --target ${{ matrix.platform.target }}
+
+      - name: Upload Artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/${{ matrix.platform.target }}/release/qlock
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
