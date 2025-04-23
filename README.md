@@ -1,5 +1,7 @@
 # qlock
 
+![test status main](https://github.com/emmagamma/qlock/actions/workflows/rust.yml/badge.svg)
+
 **(pronounced 'Queue Lock', or 'clock' if ur feelin spicy?)**
 
 A CLI tool written in Rust for encrypting files locally using XChaCha20Poly1305 and Argon2 for key-derivation.
