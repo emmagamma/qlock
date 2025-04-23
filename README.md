@@ -217,3 +217,25 @@ Stored metadata includes:
 - [ ] implement parallel processing for large files/directories
 - [ ] add integrity verification commands
 - [ ] support key rotation and metadata backup
+
+## 🍻 Support the Author:
+
+> Kofi: https://ko-fi.com/emmagamma/tip
+
+> Btc:
+>
+> ```
+> 0GkTcrxwSYiU8J9LH7akzi19PKGoLyHfzB
+> ```
+
+> Eth:
+>
+> ```
+> 0xf0173f53b85488ed9d085224612e7e04c7f4ab6b
+> ```
+
+> Monero:
+>
+> ```
+> 437xv9PdTTTiAGfjgN5H73JKpYzQnnqMSd96g9ijYfCxNMYJCdNjz2RHPz8iLcF36yLJuMJ9WWCGH1oWvmtK183t3rK9H4X
+> ```
