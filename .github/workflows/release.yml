@@ -44,7 +44,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ github.run_id }}
+          name: dist-${{ github.run_id }}-${{ matrix.target }}
           path: dist/*.tar.gz
 
   upload:
@@ -59,7 +59,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
         with:
-          name: dist-${{ github.run_id }}
+          name: dist-${{ github.run_id }}-${{ matrix.target }}
           path: dist
 
       - name: Create / Update GitHub Release
