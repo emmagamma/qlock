@@ -3,36 +3,91 @@ name: Build and Release qlock
 on:
   push:
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
 
 jobs:
-  build:
-    name: Build Binaries
+  # ───────────────────────────────────────────
+  # Linux build (Ubuntu)
+  # ───────────────────────────────────────────
+  build-linux:
+    name: Build Linux Binary
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Package artifact
+        run: |
+          mkdir -p dist
+          cp target/release/qlock dist/qlock-linux
+          tar -C dist -czf dist/qlock-linux.tar.gz qlock-linux
+
+  # ───────────────────────────────────────────
+  # macOS build (Intel + ARM via matrix)
+  # ───────────────────────────────────────────
+  build-macos:
+    name: Build macOS Binaries
+    runs-on: macos-latest
 
     strategy:
       matrix:
-        platform:
-          - { target: x86_64-apple-darwin, os: macos-latest }
-          - { target: aarch64-apple-darwin, os: macos-latest }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+        # Build for Intel and Apple Silicon
+        target:
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
 
     steps:
-      - name: Checkout source
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust (with target)
+        uses: actions-rs/toolchain@v1
         with:
-          targets: ${{ matrix.platform.target }}
+          toolchain: stable
+          override: true
+          targets: ${{ matrix.target }}
 
-      - name: Build binary
+      - name: Build (release for ${{ matrix.target }})
+        run: cargo build --release --target=${{ matrix.target }}
+
+      - name: Package artifact for ${{ matrix.target }}
         run: |
-          cargo build --release --target ${{ matrix.platform.target }}
+          mkdir -p dist
+          BIN=qlock-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/qlock dist/${BIN}
+          tar -C dist -czf dist/${BIN}.tar.gz ${BIN}
 
-      - name: Upload Artifact
+  # ───────────────────────────────────────────
+  # Upload all artifacts to GitHub Release
+  # ───────────────────────────────────────────
+  upload:
+    name: Upload Release Assets
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (required for path context)
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: dist
+
+      - name: Create / Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/${{ matrix.platform.target }}/release/qlock
+          files: |
+            dist/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
