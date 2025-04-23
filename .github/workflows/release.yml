@@ -20,12 +20,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust (with macOS targets)
+      - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-          targets: x86_64-apple-darwin, aarch64-apple-darwin
+
+      - name: Add Rust targets
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
 
       - name: Build (release for ${{ matrix.target }})
         run: cargo build --release --target=${{ matrix.target }}
