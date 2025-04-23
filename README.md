@@ -1,6 +1,6 @@
 # qlock
 
-![test status main](https://github.com/emmagamma/qlock/actions/workflows/rust.yml/badge.svg)
+[![Rust](https://github.com/emmagamma/qlock/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/emmagamma/qlock/actions/workflows/rust.yml)
 
 **(pronounced 'Queue Lock', or 'clock' if ur feelin spicy?)**
 
