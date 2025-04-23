@@ -10,11 +10,55 @@ For encrypting files locally with a password before uploading them to cloud stor
 
 ## Installation
 
-```bash
-git clone git@github.com:emmagamma/qlock.git
-cd qlock/
-cargo build --release && cp target/release/qlock /usr/local/bin/qlock
-```
+#### macOS:
+
+1. You can download a pre-built binary for macOS
+
+- [Download Intel executable (x86_64)](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-x86_64.tar.gz)
+- [Download Apple Sillicon executable](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-ARM.tar.gz)
+
+2. Unzip the downloaded file:
+
+    > Note: you can also simply double click the file to unzip it, and skip the `tar` command
+
+    ```bash
+    # Change directory to whichever folder you downloaded the executable into
+    cd ./path-to-downloads
+    
+    # Unzip
+    tar -xvf qlock-darwin-x86_64.tar.gz
+    # Or, for the apple silicon version
+    tar -xvf qlock-darwin-ARM.tar.gz
+    ```
+
+3. Move the unzipped executable into your local bin, on macOS that should be `/usr/local/bin/`
+
+    ```bash
+    mv qlock-darwin-x86_64 /user/local/bin/qlock
+    # Or
+    mv qlock-darwin-ARM /user/local/bin/qlock
+    ```
+
+---
+
+#### Linux/Windows - Building from source:
+
+1. Clone the repo and cd into it
+
+    ```bash
+    git clone git@github.com:emmagamma/qlock.git && cd qlock/
+    ```
+
+2. Then, use `cargo` to build the project on your current OS, and finally copy the built executable into your local bin (You may need to replace `/usr/local/bin/qlock` below, with a different path, if your local bin is located somewhere else)
+    ```bash
+    cargo build --release && cp target/release/qlock /usr/local/bin/qlock
+    ```
+
+    > If you don't already have `cargo` and Rust installed, visit: [Rust-Lang | Install](https://www.rust-lang.org/tools/install) or [Cargo Docs | Installation](https://doc.rust-lang.org/cargo/getting-started/installation.html) for more info on how to install it.
+
+    > If you don't already have `git` installed, visit: [Git | Downloads](https://git-scm.com/downloads) and install the latest version for your OS.
+
+---
 
 ## Usage
 
@@ -160,18 +204,6 @@ Stored metadata includes:
 - Key name
 
 ## Roadmap
-
-✓ Already Completed:
-
-- [x] ~~add flags to provide a name or auto-generate one.~~
-- [x] ~~add ability to list the details for a just one key, by name.~~
-- [x] ~~add password flag, so you can skip all prompts.~~
-- [x] ~~add support for folders during encryption/decryption.~~
-- [x] ~~add -f --force-overwrite to skip the checks before overwriting files.~~
-- [x] ~~add some tests.~~
-- [x] ~~add support for multiple file inputs with per-file parameters (numbered or comma-separated).~~
-
-Next Up:
 
 - [ ] improve test coverage with more edge cases
 - [ ] add tab auto-completion for key names
