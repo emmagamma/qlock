@@ -49,14 +49,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: qlock-darwin-x86_64
-          path: dist/qlock-x86_64-apple-darwin.tar.gz
+          path: dist/qlock-darwin-x86_64.tar.gz
 
       - name: Upload ARM artifact
         if: matrix.target == 'aarch64-apple-darwin'
         uses: actions/upload-artifact@v4
         with:
           name: qlock-darwin-arm
-          path: dist/qlock-aarch64-apple-darwin.tar.gz
+          path: dist/qlock-darwin-arm.tar.gz
 
   upload:
     name: Publish Release Assets
