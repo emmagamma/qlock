@@ -6,16 +6,12 @@ on:
       - 'v*.*.*'
 
 jobs:
-  # ───────────────────────────────────────────
-  # macOS build (Intel + ARM via matrix)
-  # ───────────────────────────────────────────
   build-macos:
     name: Build macOS Binaries
     runs-on: macos-latest
 
     strategy:
       matrix:
-        # Build for Intel and Apple Silicon
         target:
           - x86_64-apple-darwin
           - aarch64-apple-darwin
@@ -24,44 +20,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust (with target)
+      - name: Setup Rust (with macOS targets)
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-          targets: ${{ matrix.target }}
+          targets: x86_64-apple-darwin, aarch64-apple-darwin
 
       - name: Build (release for ${{ matrix.target }})
         run: cargo build --release --target=${{ matrix.target }}
 
-      - name: Package artifact for ${{ matrix.target }}
+      - name: Package macOS artifact for ${{ matrix.target }}
         run: |
           mkdir -p dist
           BIN=qlock-${{ matrix.target }}
           cp target/${{ matrix.target }}/release/qlock dist/${BIN}
           tar -C dist -czf dist/${BIN}.tar.gz ${BIN}
 
-  # ───────────────────────────────────────────
-  # Upload all artifacts to GitHub Release
-  # ───────────────────────────────────────────
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/*.tar.gz
+
   upload:
-    name: Upload Release Assets
-    needs: [build-macos]
+    name: Publish Release Assets
+    needs: build-macos
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (required for path context)
+      - name: Checkout for context
         uses: actions/checkout@v4
 
       - name: Download build artifacts
         uses: actions/download-artifact@v3
         with:
+          name: dist
           path: dist
 
       - name: Create / Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*.tar.gz
+          files: dist/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
