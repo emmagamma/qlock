@@ -7,32 +7,6 @@ on:
 
 jobs:
   # ───────────────────────────────────────────
-  # Linux build (Ubuntu)
-  # ───────────────────────────────────────────
-  build-linux:
-    name: Build Linux Binary
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
-      - name: Build (release)
-        run: cargo build --release
-
-      - name: Package artifact
-        run: |
-          mkdir -p dist
-          cp target/release/qlock dist/qlock-linux
-          tar -C dist -czf dist/qlock-linux.tar.gz qlock-linux
-
-  # ───────────────────────────────────────────
   # macOS build (Intel + ARM via matrix)
   # ───────────────────────────────────────────
   build-macos:
@@ -72,7 +46,7 @@ jobs:
   # ───────────────────────────────────────────
   upload:
     name: Upload Release Assets
-    needs: [build-linux, build-macos]
+    needs: [build-macos]
     runs-on: ubuntu-latest
 
     steps:
