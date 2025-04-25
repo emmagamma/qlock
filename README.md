@@ -10,22 +10,22 @@ For encrypting files locally with a password before uploading them to cloud stor
 
 ## Installation
 
-#### macOS:
+#### macOS - Using a pre-compiled binary:
 
-1. You can download a pre-built binary for macOS
+1. You can download a pre-compiled binary for macOS, or see [Building from Source](#linuxwindowsmacos---building-from-source)
 
-- [Download Intel executable (x86_64)](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-x86_64.tar.gz)
-- [Download Apple Sillicon executable](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-ARM.tar.gz)
+- [Download macOS Intel executable (x86_64)](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-x86_64.tar.gz)
+- [Download macOS Apple Sillicon executable (ARM)](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-ARM.tar.gz)
 
 2. Unzip the downloaded file:
 
     > Note: you can also simply double click the file to unzip it, and skip the `tar` command
 
     ```bash
-    # Change directory to whichever folder you downloaded the executable into
+    # Change directory to whichever folder you downloaded the zipped executable into
     cd ./path-to-downloads
     
-    # Unzip
+    # Unzip the executable
     tar -xvf qlock-darwin-x86_64.tar.gz
     # Or, for the apple silicon version
     tar -xvf qlock-darwin-ARM.tar.gz
@@ -39,9 +39,17 @@ For encrypting files locally with a password before uploading them to cloud stor
     mv qlock-darwin-ARM /usr/local/bin/qlock
     ```
 
+4. By default, since I haven't paid apple $99, macOS will complain that this app is from an unidentified developer, assuming you trust the pre-compiled binary, you can remove this warning by running:
+
+    ```bash
+    xattr -dr com.apple.quarantine $(which qlock)
+    ```
+
+Now you should be able to use `qlock` in your terminal.
+
 ---
 
-#### Linux/Windows - Building from source:
+#### Linux/Windows/macOS - Building from source:
 
 1. Clone the repo and cd into it
 
@@ -57,6 +65,8 @@ For encrypting files locally with a password before uploading them to cloud stor
     > If you don't already have `cargo` and Rust installed, visit: [Rust-Lang | Install](https://www.rust-lang.org/tools/install) or [Cargo Docs | Installation](https://doc.rust-lang.org/cargo/getting-started/installation.html) for more info on how to install it.
 
     > If you don't already have `git` installed, visit: [Git | Downloads](https://git-scm.com/downloads) and install the latest version for your OS.
+
+Now you should be able to use `qlock` in your terminal.
 
 ---
 
