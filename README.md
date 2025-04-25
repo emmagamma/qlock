@@ -34,9 +34,9 @@ For encrypting files locally with a password before uploading them to cloud stor
 3. Move the unzipped executable into your local bin, on macOS that should be `/usr/local/bin/`
 
     ```bash
-    mv qlock-darwin-x86_64 /user/local/bin/qlock
+    mv qlock-darwin-x86_64 /usr/local/bin/qlock
     # Or
-    mv qlock-darwin-ARM /user/local/bin/qlock
+    mv qlock-darwin-ARM /usr/local/bin/qlock
     ```
 
 ---
