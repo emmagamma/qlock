@@ -137,7 +137,7 @@ qlock -d ./path-to-folder-with-qlock-files/
 > ℹ️ If you don’t supply `-p` (password), `-n` (key name), or `-o` (output) flags for each file, `qlock` will prompt you **interactively** for them:
 >
 > - You'll be asked for a **password** and **key name** (when encrypting), or just a password (when decrypting)
-> - If no output is specified, an **output name and location** will be chosen automatically based on [output naming rules](#📁-output-file-naming-rules)
+> - If no output is specified, an **output name and location** will be chosen automatically based on [output naming rules](#-output-file-naming-rules)
 
 ---
 
