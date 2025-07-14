@@ -1,12 +1,121 @@
-use crate::qlock_errors::QlockError;
 use std::fs;
 use std::io::{self};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+use crate::metadata_manager::EncryptedData;
+use crate::qlock_errors::QlockError;
+
 pub struct FileUtils;
 
 impl FileUtils {
+    pub fn filter_files_for_enc(files: &[PathBuf]) -> Vec<PathBuf> {
+        files
+            .iter()
+            .filter(|f| f.extension().is_none_or(|ext| ext != "qlock"))
+            .filter(|f| {
+                f.file_name()
+                    .is_none_or(|fname| fname != "qlock_metadata.json")
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn filter_files_for_dec(files: &[PathBuf]) -> Vec<PathBuf> {
+        files
+            .iter()
+            .filter(|f| f.extension().is_some_and(|ext| ext == "qlock"))
+            .cloned()
+            .collect()
+    }
+
+    pub fn enc_output_path(
+        file_path: &Path,
+        output_flags: &[String],
+        file_index: usize,
+        file_total: usize,
+    ) -> PathBuf {
+        let parent_dir = file_path.parent().unwrap().to_string_lossy().to_string();
+        let stem = file_path.file_stem().unwrap().to_str().unwrap().to_string();
+
+        match output_flags {
+            // Single output with multiple files - add counter to all files
+            outputs if outputs.len() == 1 && file_total > 1 => {
+                PathBuf::from(format!("{}-{:04}.qlock", outputs[0].trim(), file_index))
+            }
+            // Multiple outputs specified - use corresponding output or fall back to original filename
+            outputs if !outputs.is_empty() => {
+                if let Some(output) = outputs.get(file_index) {
+                    PathBuf::from(format!("{}.qlock", output.trim()))
+                } else {
+                    // More files than outputs - fall back to original filename
+                    if parent_dir.trim().is_empty() {
+                        PathBuf::from(format!("{stem}.qlock"))
+                    } else {
+                        PathBuf::from(format!("{parent_dir}/{stem}.qlock"))
+                    }
+                }
+            }
+            // No outputs specified - use original filename
+            _ => {
+                if parent_dir.trim().is_empty() {
+                    PathBuf::from(format!("{stem}.qlock"))
+                } else {
+                    PathBuf::from(format!("{parent_dir}/{stem}.qlock"))
+                }
+            }
+        }
+    }
+
+    pub fn dec_output_path(
+        metadata: &EncryptedData,
+        outputs: &[String],
+        idx: usize,
+        total_files: usize,
+    ) -> PathBuf {
+        let original_ext = std::path::Path::new(&metadata.input_filename)
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or("txt");
+
+        match outputs {
+            // Single output with multiple files - add counter and extension
+            outputs if outputs.len() == 1 && total_files > 1 => {
+                let base_name = &outputs[0].trim();
+                if std::path::Path::new(base_name).extension().is_some() {
+                    let stem = std::path::Path::new(base_name)
+                        .file_stem()
+                        .unwrap()
+                        .to_str()
+                        .unwrap();
+                    let ext = std::path::Path::new(base_name)
+                        .extension()
+                        .unwrap()
+                        .to_str()
+                        .unwrap();
+                    PathBuf::from(format!("{stem}-{idx:04}.{ext}"))
+                } else {
+                    PathBuf::from(format!("{base_name}-{idx:04}.{original_ext}"))
+                }
+            }
+            // Multiple outputs specified - use corresponding output or fall back
+            outputs if outputs.len() > 1 => {
+                if let Some(output) = outputs.get(idx) {
+                    let output = output.trim();
+                    if std::path::Path::new(output).extension().is_some() {
+                        PathBuf::from(output)
+                    } else {
+                        PathBuf::from(format!("{output}.{original_ext}"))
+                    }
+                } else {
+                    PathBuf::from(&metadata.input_filename)
+                }
+            }
+            // No output specified - use original filename
+            _ => PathBuf::from(&metadata.input_filename),
+        }
+    }
     pub fn prompt_for_overwrite(path: &Path, operation: &str) -> bool {
         println!(
             "File '{}' already exists. Do you want to overwrite it with the {} contents? (y/n)",
@@ -109,5 +218,82 @@ impl FileUtils {
         }
 
         Ok(())
+    }
+    pub fn get_or_prompt_password(
+        password_flag: Option<&str>,
+        is_encrypt: bool,
+    ) -> Result<String, QlockError> {
+        if let Some(pf) = password_flag {
+            if FileUtils::is_valid_pass(pf) {
+                Ok(pf.to_string())
+            } else {
+                std::process::exit(1);
+            }
+        } else {
+            let prompt = if is_encrypt {
+                "Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: "
+            } else {
+                "Enter password: "
+            };
+            loop {
+                let pass = rpassword::prompt_password(prompt).map_err(QlockError::IoError)?;
+                if FileUtils::is_valid_pass(&pass) {
+                    return Ok(pass);
+                }
+                if !is_encrypt {
+                    // For decryption, don't loop forever on invalid pass
+                    return Err(QlockError::KeyDerivationError(
+                        "Invalid password format".to_string(),
+                    ));
+                }
+            }
+        }
+    }
+
+    pub fn is_valid_pass(password: &str) -> bool {
+        let has_number_or_punctuation = password
+            .chars()
+            .any(|c| c.is_ascii_punctuation() || c.is_numeric());
+        let has_uppercase = password.chars().any(|c| c.is_uppercase());
+        let has_lowercase = password.chars().any(|c| c.is_lowercase());
+
+        if password.len() < 16 {
+            eprintln!("Password was too short, it should be at least 16 characters long...");
+
+            if !has_uppercase || !has_lowercase {
+                eprintln!("It should also contain a mix of upper and lower case letters");
+
+                if !has_number_or_punctuation {
+                    eprintln!("and at least 1 number or special character");
+                }
+            } else if !has_number_or_punctuation {
+                eprintln!("It should also contain at least 1 number or special character\n");
+            }
+
+            eprintln!("Let's try again");
+
+            return false;
+        }
+
+        if !has_uppercase || !has_lowercase {
+            eprintln!("Passwords should contain a mix of upper and lower case characters...\n");
+
+            if !has_number_or_punctuation {
+                eprintln!("It was also missing at least 1 number or special character\n");
+            }
+
+            eprintln!("Let's try again");
+
+            return false;
+        }
+
+        if !has_number_or_punctuation {
+            eprintln!(
+                "Password was missing at least 1 number or special character...\n\nLet's try again"
+            );
+            return false;
+        }
+
+        true
     }
 }

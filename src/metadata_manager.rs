@@ -30,15 +30,15 @@ pub struct MetadataManager;
 impl MetadataManager {
     pub const METADATA_FILE: &'static str = "qlock_metadata.json";
 
-    pub fn write(&self, additional_metadata: EncryptedData) -> io::Result<()> {
+    pub fn write_entry(&self, additional_metadata: EncryptedData) -> io::Result<()> {
         if !Path::new(Self::METADATA_FILE).exists() {
             let empty = SavedData { data: vec![] };
-            self.save_metadata(&empty)?;
+            self.save_all(&empty)?;
         }
 
-        let mut saved_data = self.read()?;
+        let mut saved_data = self.read_entry()?;
         saved_data.data.push(additional_metadata.clone());
-        self.save_metadata(&saved_data)?;
+        self.save_all(&saved_data)?;
 
         println!(
             "Saved metadata for encrypted key '{}' to: ./{}",
@@ -49,7 +49,7 @@ impl MetadataManager {
         Ok(())
     }
 
-    pub fn read(&self) -> io::Result<SavedData> {
+    pub fn read_entry(&self) -> io::Result<SavedData> {
         if !Path::new(Self::METADATA_FILE).exists() {
             return Ok(SavedData { data: vec![] });
         }
@@ -57,13 +57,13 @@ impl MetadataManager {
         Ok(serde_json::from_str(&metadata)?)
     }
 
-    pub fn save_metadata(&self, data: &SavedData) -> io::Result<()> {
+    pub fn save_all(&self, data: &SavedData) -> io::Result<()> {
         let serialized = serde_json::to_string(data)?;
         fs::write(Self::METADATA_FILE, serialized)
     }
 
     pub fn key_name_already_exists(&self, name: &str) -> bool {
-        if let Ok(saved_data) = self.read() {
+        if let Ok(saved_data) = self.read_entry() {
             saved_data.data.iter().any(|d| d.name == name)
         } else {
             false
@@ -85,7 +85,7 @@ impl MetadataManager {
             80
         };
 
-        match self.read() {
+        match self.read_entry() {
             Ok(saved_data) => {
                 if saved_data.data.is_empty() {
                     println!("No encrypted keys were found in {}.", Self::METADATA_FILE);
@@ -96,10 +96,10 @@ impl MetadataManager {
                     if key_name.is_some() {
                         if datum.name == key_name.clone().unwrap() {
                             was_found = true;
-                            self.print_one_key(index, datum, width);
+                            self.print_entry(index, datum, width);
                         }
                     } else {
-                        self.print_one_key(index, datum, width);
+                        self.print_entry(index, datum, width);
                     }
                 }
 
@@ -112,11 +112,11 @@ impl MetadataManager {
                     std::process::exit(1);
                 }
             }
-            Err(e) => println!("Error reading metadata: {}", e),
+            Err(e) => println!("Error reading metadata: {e}"),
         }
     }
 
-    fn print_one_key(&self, index: usize, datum: &EncryptedData, width: usize) {
+    fn print_entry(&self, index: usize, datum: &EncryptedData, width: usize) {
         println!("{}. name: {}", (index + 1), datum.name);
         println!(
             "{:indent$}input file: {}",
@@ -135,8 +135,8 @@ impl MetadataManager {
         println!();
     }
 
-    pub fn remove_metadata(&self, name: &str) -> Result<bool, QlockError> {
-        let mut saved_data = self.read().map_err(QlockError::IoError)?;
+    pub fn remove_entry(&self, name: &str) -> Result<bool, QlockError> {
+        let mut saved_data = self.read_entry().map_err(QlockError::IoError)?;
         let index = saved_data
             .data
             .iter()
@@ -147,10 +147,7 @@ impl MetadataManager {
             "You will no longer be able to decrypt {}",
             saved_data.data[index].output_filename
         );
-        println!(
-            "Are you sure you want to PERMANENTLY DELETE all metadata for {}? (y/n)",
-            name
-        );
+        println!("Are you sure you want to PERMANENTLY DELETE all metadata for {name}? (y/n)");
 
         let mut input = String::new();
         io::stdin()
@@ -158,14 +155,13 @@ impl MetadataManager {
             .map_err(QlockError::IoError)?;
 
         if input.trim() != "y" {
-            println!("Metadata for {} is still saved", name);
+            println!("Metadata for {name} is still saved");
             return Ok(false);
         }
 
         saved_data.data.remove(index);
 
-        self.save_metadata(&saved_data)
-            .map_err(QlockError::IoError)?;
+        self.save_all(&saved_data).map_err(QlockError::IoError)?;
 
         println!(
             "Removed metadata for {} from: ./{}",
@@ -178,7 +174,7 @@ impl MetadataManager {
 }
 
 fn pretty_print_vec(preceeding: &str, vec: &[u8], indent: usize, width: usize) {
-    let formatted = format!("{}{:?}", preceeding, vec);
+    let formatted = format!("{preceeding}{vec:?}");
 
     let indented = textwrap::fill(&formatted, width / 2)
         .lines()

@@ -9,8 +9,7 @@ use rand::RngCore;
 use rpassword;
 use std::fs;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::thread;
+use std::path::PathBuf;
 
 use crate::file_utils::FileUtils;
 use crate::metadata_manager::{EncryptedData, MetadataManager};
@@ -34,14 +33,8 @@ pub struct CryptoUtils {
 
 impl CryptoUtils {
     pub fn new() -> Self {
-        let num_threads: u32 = thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(1)
-            .try_into()
-            .unwrap();
-
         Self {
-            argon_params: Params::new(42_699u32, 2u32, num_threads, Some(32)).unwrap(),
+            argon_params: Params::new(42_699u32, 2u32, 1u32, Some(32)).unwrap(),
         }
     }
 
@@ -51,20 +44,20 @@ impl CryptoUtils {
         salt
     }
 
-    pub fn generate_hash(&self, content: &[u8], salt: &[u8]) -> Result<[u8; 32], QlockError> {
-        let mut hash = [0u8; 32];
+    fn argon2_hash(&self, input: &[u8], salt: &[u8]) -> Result<[u8; 32], QlockError> {
+        let mut out = [0u8; 32];
         Argon2::new(Argon2d, V0x13, self.argon_params.clone())
-            .hash_password_into(content, salt, &mut hash)
+            .hash_password_into(input, salt, &mut out)
             .map_err(|e| QlockError::KeyDerivationError(e.to_string()))?;
-        Ok(hash)
+        Ok(out)
+    }
+
+    pub fn generate_hash(&self, content: &[u8], salt: &[u8]) -> Result<[u8; 32], QlockError> {
+        self.argon2_hash(content, salt)
     }
 
     pub fn derive_key(&self, password: &[u8], salt: &[u8]) -> Result<[u8; 32], QlockError> {
-        let mut derived_key = [0u8; 32];
-        Argon2::new(Argon2d, V0x13, self.argon_params.clone())
-            .hash_password_into(password, salt, &mut derived_key)
-            .map_err(|e| QlockError::KeyDerivationError(e.to_string()))?;
-        Ok(derived_key)
+        self.argon2_hash(password, salt)
     }
 
     pub fn parse_passwords(input: &[String]) -> Vec<String> {
@@ -118,7 +111,7 @@ impl Encryptor {
         }
     }
 
-    pub fn encrypt_files(
+    pub fn enc_files(
         &self,
         files: Vec<PathBuf>,
         outputs: Vec<String>,
@@ -128,14 +121,7 @@ impl Encryptor {
         force_flag: bool,
     ) -> Result<(), QlockError> {
         let all_files = FileUtils::collect_files(&files)?;
-        let filtered_files: Vec<_> = all_files
-            .iter()
-            .filter(|f| f.extension().is_some_and(|ext| ext != "qlock"))
-            .filter(|f| {
-                f.file_name()
-                    .is_some_and(|fname| fname != "qlock_metadata.json")
-            })
-            .collect();
+        let filtered_files = FileUtils::filter_files_for_enc(&all_files);
 
         if filtered_files.is_empty() {
             println!("No files found for the specified mode.");
@@ -144,18 +130,18 @@ impl Encryptor {
 
         let file_total = filtered_files.len();
         let passwords = CryptoUtils::parse_passwords(&passwords);
-        let names: Vec<_> = names.iter().map(|s| s.trim().to_string()).collect();
+        let names: Vec<_> = names.iter().map(|s| s.trim()).collect();
 
         for (file_index, file) in filtered_files.iter().enumerate() {
-            let password_flag = passwords.get(file_index).cloned();
-            let name_flag = names.get(file_index).cloned();
+            let password_flag = passwords.get(file_index);
+            let name_flag = names.get(file_index);
 
-            self.encrypt_file_and_key(EncryptionParams {
+            self.enc_file_and_key(EncryptionParams {
                 file_path: file.to_path_buf(),
                 output_flag: outputs.clone(),
-                name_flag,
+                name_flag: name_flag.map(|s| s.to_string()),
                 auto_name_flag,
-                password_flag,
+                password_flag: password_flag.map(|s| s.to_string()),
                 force_flag,
                 file_index,
                 file_total,
@@ -165,27 +151,27 @@ impl Encryptor {
         Ok(())
     }
 
-    pub fn encrypt_file_and_key(&self, params: EncryptionParams) -> Result<(), QlockError> {
+    pub fn enc_file_and_key(&self, params: EncryptionParams) -> Result<(), QlockError> {
         println!("Encrypting file: {}", params.file_path.to_str().unwrap());
         let contents = fs::read(&params.file_path).map_err(QlockError::IoError)?;
         let key_name = self.get_key_name(params.name_flag, params.auto_name_flag)?;
 
         let password;
         if let Some(pf) = params.password_flag {
-            if validate_password(&pf) {
+            if FileUtils::is_valid_pass(&pf) {
                 password = pf;
             } else {
                 std::process::exit(1);
             }
         } else {
-            password = self.get_encryption_password_with(
+            password = self.prompt_for_enc_pass_with(
                 "Don't forget to backup your password!\n\nIf you forget your password, you will not be able to decrypt your files!\n\n(min 16 chars, mix of upper + lower case, at least 1 number or special character)\nCreate a new password: "
             )?;
         }
 
         println!("Generating a random key and encrypting your data...");
-        let (ciphertext, nonce_a, og_key) = self.encrypt_file_contents(&contents)?;
-        let output_path = self.determine_output_path(
+        let (ciphertext, nonce_a, og_key) = self.enc_file_contents(&contents)?;
+        let output_path = FileUtils::enc_output_path(
             &params.file_path,
             &params.output_flag,
             params.file_index,
@@ -193,7 +179,7 @@ impl Encryptor {
         );
 
         println!("Generating a password-derived key to encrypt the first key with...");
-        let (encrypted_key, nonce_b, salt_a) = self.encrypt_key(&password, &og_key)?;
+        let (encrypted_key, nonce_b, salt_a) = self.enc_key(&password, &og_key)?;
         let salt_b = self.crypto_utils.generate_salt();
         let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &salt_b)?;
 
@@ -210,7 +196,7 @@ impl Encryptor {
         };
 
         MetadataManager
-            .write(metadata)
+            .write_entry(metadata)
             .map_err(QlockError::IoError)?;
         FileUtils::write_with_confirmation(
             &output_path,
@@ -235,14 +221,14 @@ impl Encryptor {
                         "-a (--auto-name) is ignored because -n (--name) is already specified"
                     );
                 }
-                println!("Using key name: {}", name);
+                println!("Using key name: {name}");
                 return Ok(name);
             }
         };
 
         if auto_name_flag {
             let name = generate_random_name();
-            println!("Auto-generated name: {}", name);
+            println!("Auto-generated name: {name}");
             return Ok(name);
         }
 
@@ -257,7 +243,7 @@ impl Encryptor {
 
         if key_name.trim().is_empty() {
             let name = generate_random_name();
-            println!("Auto-generated name: {}", name);
+            println!("Auto-generated name: {name}");
             Ok(name)
         } else {
             if MetadataManager.key_name_already_exists(key_name.trim()) {
@@ -267,17 +253,16 @@ impl Encryptor {
         }
     }
 
-    pub fn get_encryption_password_with(&self, prompt: &str) -> Result<String, QlockError> {
+    pub fn prompt_for_enc_pass_with(&self, prompt: &str) -> Result<String, QlockError> {
         loop {
             let pass = rpassword::prompt_password(prompt).map_err(QlockError::IoError)?;
-
-            if validate_password(&pass) {
+            if FileUtils::is_valid_pass(&pass) {
                 return Ok(pass);
             }
         }
     }
 
-    pub fn encrypt_file_contents(
+    pub fn enc_file_contents(
         &self,
         contents: &[u8],
     ) -> Result<(Vec<u8>, XNonce, chacha20poly1305::Key), QlockError> {
@@ -292,46 +277,7 @@ impl Encryptor {
         Ok((ciphertext, nonce, key))
     }
 
-    pub fn determine_output_path(
-        &self,
-        file_path: &Path,
-        output_flags: &[String],
-        file_index: usize,
-        file_total: usize,
-    ) -> PathBuf {
-        let parent_dir = file_path.parent().unwrap().to_string_lossy().to_string();
-        let stem = file_path.file_stem().unwrap().to_str().unwrap().to_string();
-
-        match output_flags {
-            // Single output with multiple files - add counter to all files
-            outputs if outputs.len() == 1 && file_total > 1 => {
-                PathBuf::from(format!("{}-{:04}.qlock", outputs[0].trim(), file_index))
-            }
-            // Multiple outputs specified - use corresponding output or fall back to original filename
-            outputs if !outputs.is_empty() => {
-                if let Some(output) = outputs.get(file_index) {
-                    PathBuf::from(format!("{}.qlock", output.trim()))
-                } else {
-                    // More files than outputs - fall back to original filename
-                    if parent_dir.trim().is_empty() {
-                        PathBuf::from(format!("{}.qlock", stem))
-                    } else {
-                        PathBuf::from(format!("{}/{}.qlock", parent_dir, stem))
-                    }
-                }
-            }
-            // No outputs specified - use original filename
-            _ => {
-                if parent_dir.trim().is_empty() {
-                    PathBuf::from(format!("{}.qlock", stem))
-                } else {
-                    PathBuf::from(format!("{}/{}.qlock", parent_dir, stem))
-                }
-            }
-        }
-    }
-
-    pub fn encrypt_key(
+    pub fn enc_key(
         &self,
         password: &str,
         key: &[u8],
@@ -367,7 +313,7 @@ impl Decryptor {
         }
     }
 
-    pub fn decrypt_files(
+    pub fn dec_files(
         &self,
         files: Vec<PathBuf>,
         outputs: Vec<String>,
@@ -375,16 +321,13 @@ impl Decryptor {
         force: bool,
     ) -> Result<(), QlockError> {
         let all_files = FileUtils::collect_files(&files)?;
-        let qlock_files: Vec<_> = all_files
-            .iter()
-            .filter(|f| f.extension().is_some_and(|ext| ext == "qlock"))
-            .collect();
+        let qlock_files = FileUtils::filter_files_for_dec(&all_files);
         let total_files = qlock_files.len();
 
         let passwords = CryptoUtils::parse_passwords(&passwords);
 
         for (idx, file) in qlock_files.iter().enumerate() {
-            let password = passwords.get(idx).cloned();
+            let password = passwords.get(idx);
             let outputs: Vec<String> = if outputs.len() == 1 && outputs[0].contains(',') {
                 outputs[0]
                     .split(',')
@@ -394,13 +337,20 @@ impl Decryptor {
                 outputs.clone()
             };
 
-            self.decrypt_key_and_file(file, outputs.clone(), password, force, idx, total_files)?;
+            self.dec_key_and_file(
+                file,
+                outputs.clone(),
+                password.map(|s| s.to_string()),
+                force,
+                idx,
+                total_files,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn decrypt_key_and_file(
+    pub fn dec_key_and_file(
         &self,
         file_path: &PathBuf,
         output_path: Vec<String>,
@@ -411,22 +361,16 @@ impl Decryptor {
     ) -> Result<(), QlockError> {
         println!("Decrypting file: {}", file_path.to_str().unwrap());
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
-        let saved = MetadataManager.read().map_err(QlockError::IoError)?;
+        let saved = MetadataManager.read_entry().map_err(QlockError::IoError)?;
 
         for datum in saved.data {
-            if self.verify_hash(&contents, &datum)? {
+            if self.is_hash_valid(&contents, &datum)? {
                 let output_path =
-                    self.determine_output_path(&datum, &output_path, idx, total_files);
+                    FileUtils::dec_output_path(&datum, &output_path, idx, total_files);
 
-                let password;
-                if let Some(pf) = password_flag {
-                    password = pf;
-                } else {
-                    password = self.get_decryption_password()?;
-                }
+                let password = FileUtils::get_or_prompt_password(password_flag.as_deref(), false)?;
 
-                let decrypted_contents =
-                    self.decrypt_file_contents(&password, &contents, &datum)?;
+                let decrypted_contents = self.dec_file_contents(&password, &contents, &datum)?;
                 return FileUtils::write_with_confirmation(
                     &output_path,
                     &decrypted_contents,
@@ -445,17 +389,16 @@ impl Decryptor {
         Ok(())
     }
 
-    pub fn verify_hash(&self, contents: &[u8], datum: &EncryptedData) -> Result<bool, QlockError> {
+    pub fn is_hash_valid(
+        &self,
+        contents: &[u8],
+        datum: &EncryptedData,
+    ) -> Result<bool, QlockError> {
         let hash = self.crypto_utils.generate_hash(contents, &datum.salt_b)?;
         Ok(hash.to_vec() == datum.hash)
     }
 
-    pub fn get_decryption_password(&self) -> Result<String, QlockError> {
-        rpassword::prompt_password("Enter password: ")
-            .map_err(|e| QlockError::IoError(io::Error::new(io::ErrorKind::Other, e)))
-    }
-
-    pub fn decrypt_file_contents(
+    pub fn dec_file_contents(
         &self,
         password: &str,
         contents: &[u8],
@@ -479,102 +422,10 @@ impl Decryptor {
             .decrypt(nonce_a, contents)
             .map_err(|e| QlockError::DecryptionError(e.to_string()))
     }
-
-    pub fn determine_output_path(
-        &self,
-        metadata: &EncryptedData,
-        outputs: &[String],
-        idx: usize,
-        total_files: usize,
-    ) -> PathBuf {
-        let original_ext = Path::new(&metadata.input_filename)
-            .extension()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or("txt");
-
-        let path = match outputs {
-            // Single output with multiple files - add counter and extension
-            outputs if outputs.len() == 1 && total_files > 1 => {
-                let base_name = &outputs[0].trim();
-                if Path::new(base_name).extension().is_some() {
-                    let stem = Path::new(base_name).file_stem().unwrap().to_str().unwrap();
-                    let ext = Path::new(base_name).extension().unwrap().to_str().unwrap();
-                    PathBuf::from(format!("{}-{:04}.{}", stem, idx, ext))
-                } else {
-                    PathBuf::from(format!("{}-{:04}.{}", base_name, idx, original_ext))
-                }
-            }
-            // Multiple outputs specified - use corresponding output or fall back
-            outputs if outputs.len() > 1 => {
-                if let Some(output) = outputs.get(idx) {
-                    let output = output.trim();
-                    if Path::new(output).extension().is_some() {
-                        PathBuf::from(output)
-                    } else {
-                        PathBuf::from(format!("{}.{}", output, original_ext))
-                    }
-                } else {
-                    PathBuf::from(&metadata.input_filename)
-                }
-            }
-            // No output specified - use original filename
-            _ => PathBuf::from(&metadata.input_filename),
-        };
-
-        path
-    }
 }
 
 impl Default for Decryptor {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn validate_password(password: &str) -> bool {
-    let has_number_or_punctuation = password
-        .chars()
-        .any(|c| c.is_ascii_punctuation() || c.is_numeric());
-    let has_uppercase = password.chars().any(|c| c.is_uppercase());
-    let has_lowercase = password.chars().any(|c| c.is_lowercase());
-
-    if password.len() < 16 {
-        eprintln!("Password was too short, it should be at least 16 characters long...");
-
-        if !has_uppercase || !has_lowercase {
-            eprintln!("It should also contain a mix of upper and lower case letters");
-
-            if !has_number_or_punctuation {
-                eprintln!("and at least 1 number or special character");
-            }
-        } else if !has_number_or_punctuation {
-            eprintln!("It should also contain at least 1 number or special character\n");
-        }
-
-        eprintln!("Let's try again");
-
-        return false;
-    }
-
-    if !has_uppercase || !has_lowercase {
-        eprintln!("Passwords should contain a mix of upper and lower case characters...\n");
-
-        if !has_number_or_punctuation {
-            eprintln!("It was also missing at least 1 number or special character\n");
-        }
-
-        eprintln!("Let's try again");
-
-        return false;
-    }
-
-    if !has_number_or_punctuation {
-        eprintln!(
-            "Password was missing at least 1 number or special character...\n\nLet's try again"
-        );
-        return false;
-    }
-
-    true
 }

@@ -62,5 +62,5 @@ pub fn generate_random_name() -> String {
         number = digits.iter().collect::<String>().parse().unwrap();
     }
 
-    format!("{}-{}-{:04}", first, second, number).to_string()
+    format!("{first}-{second}-{number:04}").to_string()
 }

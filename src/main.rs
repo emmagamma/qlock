@@ -169,8 +169,8 @@ fn main() -> Result<(), QlockError> {
                 eprintln!("Please specify the name of an encrypted key to remove...");
                 println!("(try `qlock ls` to see them all)");
                 std::process::exit(1);
-            } else if let Err(e) = MetadataManager.remove_metadata(&key_name.unwrap()) {
-                eprintln!("{}", e);
+            } else if let Err(e) = MetadataManager.remove_entry(&key_name.unwrap()) {
+                eprintln!("{e}");
             }
             return Ok(());
         }
@@ -196,7 +196,7 @@ fn main() -> Result<(), QlockError> {
     if let Some(action) = cli.action {
         match (action.encrypt, action.decrypt) {
             (true, false) => {
-                if let Err(e) = Encryptor::new().encrypt_files(
+                if let Err(e) = Encryptor::new().enc_files(
                     action.files,
                     action.output,
                     action.name,
@@ -204,7 +204,7 @@ fn main() -> Result<(), QlockError> {
                     action.auto_name,
                     action.force,
                 ) {
-                    eprintln!("{}", e);
+                    eprintln!("{e}");
                     std::process::exit(1);
                 }
             }
@@ -216,13 +216,13 @@ fn main() -> Result<(), QlockError> {
                     eprintln!("-a or --auto-name will be ignored, not needed during decryption");
                 }
 
-                if let Err(e) = Decryptor::new().decrypt_files(
+                if let Err(e) = Decryptor::new().dec_files(
                     action.files,
                     action.output,
                     action.password,
                     action.force,
                 ) {
-                    eprintln!("{}", e);
+                    eprintln!("{e}");
                     std::process::exit(1);
                 }
             }
