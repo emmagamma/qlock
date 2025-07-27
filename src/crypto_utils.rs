@@ -12,7 +12,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use crate::file_utils::FileUtils;
-use crate::metadata_manager::{EncryptedData, MetadataManager};
+use crate::metadata_manager::{Metadata, MetadataManager};
 use crate::qlock_errors::QlockError;
 use crate::word_lists::generate_random_name;
 
@@ -183,20 +183,18 @@ impl Encryptor {
         let salt_b = self.crypto_utils.generate_salt();
         let hash_bytes = self.crypto_utils.generate_hash(&ciphertext, &salt_b)?;
 
-        let metadata = EncryptedData {
-            name: key_name,
-            key: encrypted_key,
-            hash: hash_bytes.to_vec(),
-            nonce_a: nonce_a.to_vec(),
-            nonce_b: nonce_b.to_vec(),
-            salt_a: salt_a.to_vec(),
-            salt_b: salt_b.to_vec(),
-            input_filename: params.file_path.to_string_lossy().to_string(),
-            output_filename: output_path.to_string_lossy().to_string(),
-        };
-
         MetadataManager
-            .write_entry(metadata)
+            .write_one(&Metadata {
+                name: key_name,
+                key: encrypted_key,
+                hash: hash_bytes.to_vec(),
+                nonce_a: nonce_a.to_vec(),
+                nonce_b: nonce_b.to_vec(),
+                salt_a: salt_a.to_vec(),
+                salt_b: salt_b.to_vec(),
+                input_filename: params.file_path.to_string_lossy().to_string(),
+                output_filename: output_path.to_string_lossy().to_string(),
+            })
             .map_err(QlockError::IoError)?;
         FileUtils::write_with_confirmation(
             &output_path,
@@ -213,7 +211,7 @@ impl Encryptor {
         auto_name_flag: bool,
     ) -> Result<String, QlockError> {
         if let Some(name) = name_flag {
-            if MetadataManager.key_name_already_exists(&name) {
+            if MetadataManager.key_name_exists(&name) {
                 return Err(QlockError::KeyAlreadyExists(name));
             } else {
                 if auto_name_flag {
@@ -246,7 +244,7 @@ impl Encryptor {
             println!("Auto-generated name: {name}");
             Ok(name)
         } else {
-            if MetadataManager.key_name_already_exists(key_name.trim()) {
+            if MetadataManager.key_name_exists(key_name.trim()) {
                 return Err(QlockError::KeyAlreadyExists(key_name.trim().to_string()));
             }
             Ok(key_name.trim().to_string())
@@ -382,18 +380,14 @@ impl Decryptor {
         }
 
         println!(
-            "no matching key found in '{}' for file: '{}'",
-            MetadataManager::METADATA_FILE,
-            file_path.display()
+            "no matching key for {} found in '{}/'",
+            file_path.display(),
+            MetadataManager::METADATA_DIR,
         );
         Ok(())
     }
 
-    pub fn is_hash_valid(
-        &self,
-        contents: &[u8],
-        datum: &EncryptedData,
-    ) -> Result<bool, QlockError> {
+    pub fn is_hash_valid(&self, contents: &[u8], datum: &Metadata) -> Result<bool, QlockError> {
         let hash = self.crypto_utils.generate_hash(contents, &datum.salt_b)?;
         Ok(hash.to_vec() == datum.hash)
     }
@@ -402,7 +396,7 @@ impl Decryptor {
         &self,
         password: &str,
         contents: &[u8],
-        datum: &EncryptedData,
+        datum: &Metadata,
     ) -> Result<Vec<u8>, QlockError> {
         let derived_key = self
             .crypto_utils

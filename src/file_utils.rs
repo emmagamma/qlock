@@ -3,7 +3,7 @@ use std::io::{self};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use crate::metadata_manager::EncryptedData;
+use crate::metadata_manager::Metadata;
 use crate::qlock_errors::QlockError;
 
 pub struct FileUtils;
@@ -12,10 +12,9 @@ impl FileUtils {
     pub fn filter_files_for_enc(files: &[PathBuf]) -> Vec<PathBuf> {
         files
             .iter()
-            .filter(|f| f.extension().is_none_or(|ext| ext != "qlock"))
             .filter(|f| {
-                f.file_name()
-                    .is_none_or(|fname| fname != "qlock_metadata.json")
+                f.extension().is_none_or(|ext| ext != "qlock")
+                    && !f.components().any(|c| c.as_os_str() == ".qlock_metadata")
             })
             .cloned()
             .collect()
@@ -68,7 +67,7 @@ impl FileUtils {
     }
 
     pub fn dec_output_path(
-        metadata: &EncryptedData,
+        metadata: &Metadata,
         outputs: &[String],
         idx: usize,
         total_files: usize,
@@ -157,7 +156,11 @@ impl FileUtils {
         let mut all_files = Vec::new();
 
         for path in paths {
-            if path.is_file() {
+            if path.is_file()
+                && !path
+                    .components()
+                    .any(|c| c.as_os_str() == ".qlock_metadata")
+            {
                 all_files.push(path.to_path_buf());
             }
         }
@@ -168,7 +171,10 @@ impl FileUtils {
                     .follow_links(true)
                     .into_iter()
                     .filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_file())
+                    .filter(|e| {
+                        let p = e.path();
+                        p.is_file() && !p.components().any(|c| c.as_os_str() == ".qlock_metadata")
+                    })
                     .map(|e| e.path().to_path_buf())
                     .collect();
                 dir_files.sort();
@@ -185,15 +191,17 @@ impl FileUtils {
             all_files
                 .into_iter()
                 .filter(|f| {
-                    f.extension().is_none_or(|ext| ext != "qlock")
-                        && f.file_name()
-                            .is_none_or(|fname| fname != "qlock_metadata.json")
+                    !f.components().any(|c| c.as_os_str() == ".qlock_metadata")
+                        && f.extension().is_none_or(|ext| ext != "qlock")
                 })
                 .collect()
         } else {
             all_files
                 .into_iter()
-                .filter(|f| f.extension().is_some_and(|ext| ext == "qlock"))
+                .filter(|f| {
+                    !f.components().any(|c| c.as_os_str() == ".qlock_metadata")
+                        && f.extension().is_some_and(|ext| ext == "qlock")
+                })
                 .collect()
         };
 
@@ -219,6 +227,7 @@ impl FileUtils {
 
         Ok(())
     }
+
     pub fn get_or_prompt_password(
         password_flag: Option<&str>,
         is_encrypt: bool,

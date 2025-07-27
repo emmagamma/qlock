@@ -315,7 +315,7 @@ mod tests {
 
         std::fs::remove_file(temp_dir.path().join("dir/output1.qlock"))?;
         std::fs::remove_file(temp_dir.path().join("dir/output2.qlock"))?;
-        std::fs::remove_file(temp_dir.path().join("qlock_metadata.json"))?;
+        std::fs::remove_dir_all(temp_dir.path().join(".qlock_metadata"))?;
 
         let encrypt_args_numbered = &[
             "-e",
@@ -507,8 +507,7 @@ mod tests {
         let ls_output = execute_qlock_command(&temp_dir, ls_args)?;
         assert_command_success(&ls_output);
         assert!(
-            String::from_utf8_lossy(&ls_output.stdout)
-                .contains("qlock_metadata.json does not exist")
+            String::from_utf8_lossy(&ls_output.stdout).contains(".qlock_metadata/ does not exist")
         );
 
         Ok(())
@@ -609,7 +608,7 @@ mod tests {
         assert_command_success(&output);
         assert!(
             String::from_utf8_lossy(&output.stdout)
-                .contains("Removed metadata for test-key from: ./qlock_metadata.json")
+                .contains("Removed metadata for test-key from: .qlock_metadata/")
         );
 
         let ls_args = &["ls", "test-key"];

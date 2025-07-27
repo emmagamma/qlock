@@ -6,9 +6,9 @@
 
 A CLI tool written in Rust for encrypting files locally using XChaCha20Poly1305 and Argon2 for key-derivation.
 
-Use `qlock` to encrypt files before uploading them to cloud storage, backing up sensitive documents, or transferring data securely. It encrypts each file with a unique key, then encrypts that key using a password-derived key. The tool stores encrypted keys and associated metadata in a local file named `qlock_metadata.json`.
+Use `qlock` to encrypt files before uploading them to cloud storage, backing up sensitive documents, or transferring data securely. It encrypts each file with a unique key, then encrypts that key using a password-derived key. The tool stores metadata neccessary to decrypt the resulting output `*.qlock` files in a folder named `.qlock_metadata/` in individual `.json` files for each file you encrypt.
 
-> 🔐 You’ll need both your password(s) and `qlock_metadata.json` to decrypt your `.qlock` files — be sure to save them securely.
+> 🔐 You’ll need your password(s) for each file and each associated `.json` file in the `.qlock_metadata/` folder, in order to decrypt your `.qlock` files — be sure to save them securely.
 
 ---
 
@@ -89,7 +89,7 @@ qlock -e myfile.txt -p "mypassword" -n "my-key-name"
 qlock -d myfile.qlock -p "mypassword"
 ```
 
-> 💡 `-n` or `--name` assigns a human-friendly name to your encrypted key (saved in `qlock_metadata.json`).
+> 💡 `-n` or `--name` assigns a human-friendly name to your encrypted key (saved in `.qlock_metadata/`).
 
 ---
 
@@ -213,7 +213,7 @@ When you don’t provide `-o`/`--output`, output files are named and placed base
 
 - **Without `-o`:** Files are output next to the originals within the directory structure.
   - **Encryption:** The original file name is used, but the file extension is replaced with `.qlock`
-  - **Decryption:** The original file name (including extension) is restored using information stored in `qlock_metadata.json`
+  - **Decryption:** The original file name (including extension) is restored using information stored in `.qlock_metadata/`
 
 - **With `-o`:** Files are output in the directory you run the command from.
   - **Encryption:** The `.qlock` extension is added automatically — you don’t need to include one
@@ -232,8 +232,8 @@ When you don’t provide `-o`/`--output`, output files are named and placed base
 - No formal security audit of this repo has ever been performed
 - Uses non-NIST algorithms
 - Passwords are **never stored** by this tool
-- `qlock_metadata.json` contains sensitive info that could be used in a brute-force attack to decrypt your `.qlock` files, given a powerful enough supercomputer — **don’t share it with anyone who shouldn't have access to your decrypted files**
-- If you lose either your password or your `qlock_metadata.json` file, the data in your `.qlock` files cannot be recovered
+- `.qlock_metadata/` contains sensitive info that could be used in a brute-force attack to decrypt your `.qlock` files, given a powerful enough supercomputer — **don’t share it with anyone who shouldn't have access to your decrypted files**
+- If you lose either your password or the `.json` files stored within the `.qlock_metadata/` folder, then the data in your `.qlock` files cannot be recovered
 - Use a password manager to securely store your passwords
 
 ---
@@ -246,9 +246,9 @@ Encryption flow:
 2. Encrypted content is saved with a `.qlock` extension
 3. A second key is derived from your password using Argon2
 4. The file key is encrypted with the password-derived key
-5. The encrypted key and associated metadata are stored in `qlock_metadata.json`
+5. The encrypted key and associated metadata are stored in `.qlock_metadata/`
 
-> ℹ️ The password-derived key is never stored — and neither is your password. During decryption, qlock re-derives the password key on-the-fly using the password you provide. That key is then used to decrypt the file key (stored in qlock_metadata.json), which is finally used to decrypt the contents of your .qlock file.
+> ℹ️ The password-derived key is never stored — and neither is your password. The ciphertext of the file key is stored, but not the file key itself. During decryption, qlock re-derives the password key on-the-fly using the password you provide. That key is then used to decrypt the file key (stored in `.qlock_metadata/`), which is finally used to decrypt the contents of your .qlock file.
 
 Stored metadata includes:
 

@@ -13,18 +13,21 @@ use qlock::qlock_errors::QlockError;
     about,
     long_about = Some("Encrypt/Decrypt files protected by a password"),
     override_usage = "\
-       # Single File:
+       # Encrypt a single File:
        qlock -e <FILE>
+       # Decrypt the resulting `.qlock` file output by the previous command
        qlock -d <FILE.qlock>
 
-       # Multiple Files, with flags to skip the prompts:
+       # Encrypt multiple files, with flags to skip the interactive prompts:
        qlock -e <FILE-1> <FILE-2> -p1=\"pass1\" -p2=\"pass2\" -n1=\"key1\" -n2=\"key2\" -o1=\"out1\" -o2=\"out2\"
        qlock -e <FILE-1> <FILE-2> -p \"pass1, pass2\" -n \"key1, key2\" -o \"encrypted-1, encrypted-2\"
+       # Decyrpt multiple files, with flags to skip the interactive prompts:
        qlock -d <FILE-1.qlock> <FILE-2.qlock> -p1=\"pass1\" -p2=\"pass2\" -o1=\"decrypted-1.md\" -o2=\"decrypted-2.js\"
        qlock -d <FILE-1.qlock> <FILE-2.qlock> -p \"pass1, pass2\" -o \"decrypted-1.jpeg, decrypted-2.jpeg\"
 
-       # All files within a directory, recursively (ignores all `.qlock` files and `qlock_metadata.json`):
+       # Encrypt all files within a directory, recursively
        qlock -e <Folder>
+       # Decrypt all files within a directory, recursively
        qlock -d <Folder>"
 )]
 struct Qlock {
@@ -41,11 +44,13 @@ struct ActionArgs {
     #[arg(value_parser = clap::value_parser!(PathBuf), required = false, num_args = 1..)]
     files: Vec<PathBuf>,
 
-    /// Encrypt a file, multiple files, or all files within a folder recursively (excluding those ending in `.qlock`, and `qlock_metadata.json`)
+    /// Encrypt a file, multiple files, or all files within a folder recursively
+    /// - ignores `.qlock` files and metadata stored in `.qlock_metadata/`
     #[arg(short = 'e', long = "encrypt", group = "action")]
     encrypt: bool,
 
     /// Decrypt a `.qlock` file, multiple `.qlock` files, or all `.qlock` files within a folder recursively
+    /// - ignores metadata stored in `.qlock_metadata/`
     #[arg(short = 'd', long = "decrypt", group = "action")]
     decrypt: bool,
 
@@ -133,13 +138,13 @@ fn parse_numbered_or_list(input: &str) -> Result<String, String> {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// List all encrypted keys saved in `qlock_metadata.json`, or use `qlock ls <key-name>` to just show one
+    /// List all encrypted keys saved in `.qlock_metadata/`, or use `qlock ls <key-name>` to just show one
     Ls {
         /// The name of the encrypted key you want to list
         #[arg(value_parser = clap::value_parser!(String))]
         key_name: Option<String>,
     },
-    /// Remove an encrypted key from `qlock_metadata.json` by passing it's name `qlock rm <key-name>`
+    /// Remove an encrypted key from `.qlock_metadata/` by passing it's key name `qlock rm <key-name>`
     Rm {
         /// The name of the encrypted key to remove
         #[arg(value_parser = clap::value_parser!(String))]
@@ -169,7 +174,7 @@ fn main() -> Result<(), QlockError> {
                 eprintln!("Please specify the name of an encrypted key to remove...");
                 println!("(try `qlock ls` to see them all)");
                 std::process::exit(1);
-            } else if let Err(e) = MetadataManager.remove_entry(&key_name.unwrap()) {
+            } else if let Err(e) = MetadataManager.remove(&key_name.unwrap()) {
                 eprintln!("{e}");
             }
             return Ok(());

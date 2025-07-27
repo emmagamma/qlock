@@ -1,4 +1,8 @@
-use std::{fs, io, path::Path};
+use std::{
+    fs::{self, create_dir_all},
+    io,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +12,7 @@ use textwrap;
 use crate::qlock_errors::QlockError;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct EncryptedData {
+pub struct Metadata {
     pub name: String,
     pub hash: Vec<u8>,
     pub key: Vec<u8>,
@@ -21,60 +25,96 @@ pub struct EncryptedData {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SavedData {
-    pub data: Vec<EncryptedData>,
+pub struct MetadataList {
+    pub data: Vec<Metadata>,
 }
 
 pub struct MetadataManager;
 
 impl MetadataManager {
-    pub const METADATA_FILE: &'static str = "qlock_metadata.json";
+    pub const METADATA_DIR: &'static str = ".qlock_metadata";
 
-    pub fn write_entry(&self, additional_metadata: EncryptedData) -> io::Result<()> {
-        if !Path::new(Self::METADATA_FILE).exists() {
-            let empty = SavedData { data: vec![] };
-            self.save_all(&empty)?;
+    /// Reads all metadata.json files from .qlock_metadata/ and returns a MetadataList containing all entries.
+    pub fn read_all(&self) -> io::Result<MetadataList> {
+        let mut data = Vec::new();
+        let dir = Path::new(Self::METADATA_DIR);
+
+        if dir.exists() {
+            let mut entries: Vec<_> = fs::read_dir(dir)?.filter_map(|e| e.ok()).collect();
+            entries.sort_by_key(|e| e.file_name());
+            for entry in entries {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                    let contents = fs::read_to_string(&path)?;
+                    if let Ok(meta) = serde_json::from_str::<Metadata>(&contents) {
+                        data.push(meta);
+                    }
+                }
+            }
         }
 
-        let mut saved_data = self.read_all()?;
-        saved_data.data.push(additional_metadata.clone());
-        self.save_all(&saved_data)?;
+        Ok(MetadataList { data })
+    }
+
+    /// Write a single metadata file to `.qlock_metadata/`.
+    pub fn write_one(&self, metadata: &Metadata) -> io::Result<PathBuf> {
+        let path = Path::new(&metadata.output_filename);
+        let file_stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown");
+        let short_hash = metadata
+            .hash
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .take(7)
+            .collect::<String>();
+
+        create_dir_all(Self::METADATA_DIR)?;
+
+        let file_name = format!("{file_stem}.{short_hash}.json");
+        let file_path = Path::new(Self::METADATA_DIR).join(file_name);
+
+        let serialized = serde_json::to_string_pretty(metadata)?;
+        fs::write(&file_path, serialized)?;
 
         println!(
-            "Saved metadata for encrypted key '{}' to: ./{}",
-            additional_metadata.name,
-            Self::METADATA_FILE
+            "Saved metadata for encrypted key '{}' to: {}/{}",
+            metadata.name,
+            Self::METADATA_DIR,
+            file_path.file_name().unwrap().to_string_lossy()
         );
 
+        Ok(file_path)
+    }
+
+    /// Save all metadata entries in the given MetadataList to individual files in .qlock_metadata.
+    /// Each entry will be saved using write_metadata, using the output_filename and hash.
+    pub fn write_all(&self, metadata_list: &MetadataList) -> io::Result<()> {
+        for entry in &metadata_list.data {
+            self.write_one(entry)?;
+        }
         Ok(())
     }
 
-    pub fn read_all(&self) -> io::Result<SavedData> {
-        if !Path::new(Self::METADATA_FILE).exists() {
-            return Ok(SavedData { data: vec![] });
-        }
-        let metadata = fs::read_to_string(Self::METADATA_FILE)?;
-        Ok(serde_json::from_str(&metadata)?)
-    }
-
-    pub fn save_all(&self, data: &SavedData) -> io::Result<()> {
-        let serialized = serde_json::to_string(data)?;
-        fs::write(Self::METADATA_FILE, serialized)
-    }
-
-    pub fn key_name_already_exists(&self, name: &str) -> bool {
-        if let Ok(saved_data) = self.read_all() {
-            saved_data.data.iter().any(|d| d.name == name)
+    /// Checks if a key name already exists in the metadata directory.
+    pub fn key_name_exists(&self, name: &str) -> bool {
+        if let Ok(metadata_list) = self.read_all() {
+            metadata_list.data.iter().any(|d| d.name == name)
         } else {
             false
         }
     }
 
+    /// Lists all metadata entries from the metadata directory.
+    /// If `key_name` is provided, only lists entries matching that name.
+    /// Otherwise, lists all entries.
     pub fn list(&self, key_name: Option<String>) {
-        if !Path::new(Self::METADATA_FILE).exists() {
+        let dir = Path::new(Self::METADATA_DIR);
+        if !dir.exists() {
             println!(
-                "{} does not exist, try encrypting something first or make sure you're in the correct directory.",
-                Self::METADATA_FILE
+                "{}/ does not exist, try encrypting something first or make sure you're in the correct directory.",
+                Self::METADATA_DIR
             );
             return;
         }
@@ -86,28 +126,27 @@ impl MetadataManager {
         };
 
         match self.read_all() {
-            Ok(saved_data) => {
-                if saved_data.data.is_empty() {
-                    println!("No encrypted keys were found in {}.", Self::METADATA_FILE);
+            Ok(metadata_list) => {
+                if metadata_list.data.is_empty() {
+                    println!("No encrypted keys were found in {}.", Self::METADATA_DIR);
                     return;
                 }
                 let mut was_found = false;
-                for (index, datum) in saved_data.data.iter().enumerate() {
-                    if key_name.is_some() {
-                        if datum.name == key_name.clone().unwrap() {
+                for (index, datum) in metadata_list.data.iter().enumerate() {
+                    if let Some(ref name) = key_name {
+                        if &datum.name == name {
                             was_found = true;
-                            self.print_entry(index, datum, width);
+                            self.print_one_metadata(index, datum, width);
                         }
                     } else {
-                        self.print_entry(index, datum, width);
+                        self.print_one_metadata(index, datum, width);
                     }
                 }
-
-                if !was_found && key_name.is_some() {
+                if key_name.is_some() && !was_found {
                     eprintln!(
                         "No encrypted key with name '{}' was found in {}.",
                         key_name.unwrap(),
-                        Self::METADATA_FILE
+                        Self::METADATA_DIR
                     );
                     std::process::exit(1);
                 }
@@ -116,7 +155,7 @@ impl MetadataManager {
         }
     }
 
-    fn print_entry(&self, index: usize, datum: &EncryptedData, width: usize) {
+    fn print_one_metadata(&self, index: usize, datum: &Metadata, width: usize) {
         println!("{}. name: {}", (index + 1), datum.name);
         println!(
             "{:indent$}input file: {}",
@@ -135,41 +174,57 @@ impl MetadataManager {
         println!();
     }
 
-    pub fn remove_entry(&self, name: &str) -> Result<bool, QlockError> {
-        let mut saved_data = self.read_all().map_err(QlockError::IoError)?;
-        let index = saved_data
-            .data
-            .iter()
-            .position(|d| d.name == name)
-            .ok_or(QlockError::MetadataNotFound(name.to_string()))?;
+    /// Removes the metadata file (from the `.qlock_metadata` directory) by key name.
+    pub fn remove(&self, name: &str) -> Result<bool, QlockError> {
+        let metadata_list = self.read_all().map_err(QlockError::IoError)?;
+        let maybe_entry = metadata_list.data.iter().find(|d| d.name == name);
 
-        println!(
-            "You will no longer be able to decrypt {}",
-            saved_data.data[index].output_filename
-        );
-        println!("Are you sure you want to PERMANENTLY DELETE all metadata for {name}? (y/n)");
+        if let Some(entry) = maybe_entry {
+            let path = Path::new(&entry.output_filename);
+            let file_stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+            let short_hash = entry
+                .hash
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .take(7)
+                .collect::<String>();
+            let file_name = format!("{file_stem}.{short_hash}.json");
+            let file_path = Path::new(Self::METADATA_DIR).join(&file_name);
 
-        let mut input = String::new();
-        io::stdin()
-            .read_line(&mut input)
-            .map_err(QlockError::IoError)?;
+            println!("{}", file_path.display());
 
-        if input.trim() != "y" {
-            println!("Metadata for {name} is still saved");
-            return Ok(false);
+            println!(
+                "You will no longer be able to decrypt {}",
+                entry.output_filename
+            );
+            println!("Are you sure you want to PERMANENTLY DELETE all metadata for {name}? (y/n)");
+
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .map_err(QlockError::IoError)?;
+
+            if input.trim() != "y" {
+                println!("Metadata for {name} is still saved");
+                return Ok(false);
+            }
+
+            fs::remove_file(&file_path).map_err(QlockError::IoError)?;
+
+            println!(
+                "Removed metadata for {} from: {}/{}",
+                name,
+                Self::METADATA_DIR,
+                file_path.file_name().unwrap().to_string_lossy()
+            );
+
+            Ok(true)
+        } else {
+            Err(QlockError::MetadataNotFound(name.to_string()))
         }
-
-        saved_data.data.remove(index);
-
-        self.save_all(&saved_data).map_err(QlockError::IoError)?;
-
-        println!(
-            "Removed metadata for {} from: ./{}",
-            name,
-            Self::METADATA_FILE
-        );
-
-        Ok(true)
     }
 }
 
