@@ -18,8 +18,8 @@ Use `qlock` to encrypt files before uploading them to cloud storage, backing up 
 
 1. Download the appropriate macOS binary for your machine:
 
-- [Download macOS Intel executable (x86_64)](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-x86_64.tar.gz)
-- [Download macOS Apple Silicon executable (ARM)](https://github.com/emmagamma/qlock/releases/download/v0.5.0/qlock-darwin-ARM.tar.gz)
+- [Download macOS Intel executable (x86_64)](https://github.com/emmagamma/qlock/releases/download/v0.5.1/qlock-darwin-x86_64.tar.gz)
+- [Download macOS Apple Silicon executable (ARM)](https://github.com/emmagamma/qlock/releases/download/v0.5.1/qlock-darwin-ARM.tar.gz)
 
 2. Unzip the downloaded file:
 
