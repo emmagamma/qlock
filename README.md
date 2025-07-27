@@ -6,7 +6,7 @@
 
 A CLI tool written in Rust for encrypting files locally using XChaCha20Poly1305 and Argon2 for key-derivation.
 
-Use `qlock` to encrypt files before uploading them to cloud storage, backing up sensitive documents, or transferring data securely. It encrypts each file with a unique key, then encrypts that key using a password-derived key. The tool stores metadata neccessary to decrypt the resulting output `*.qlock` files in a folder named `.qlock_metadata/` in individual `.json` files for each file you encrypt.
+Use `qlock` to encrypt files before uploading them to cloud storage, backing up sensitive documents, or transferring data securely. Each file is encrypted with a unique, randomly generated key, which is then itself encrypted using a key that's derived from a password you provide. Wherever you run `qlock` from, it will create a dot directory called `.qlock_metadata/` where related metadata for each file you encrypt will be stored in it's own `*.json` file.
 
 > 🔐 You’ll need your password(s) for each file and each associated `.json` file in the `.qlock_metadata/` folder, in order to decrypt your `.qlock` files — be sure to save them securely.
 
