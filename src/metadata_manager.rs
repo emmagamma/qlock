@@ -36,7 +36,7 @@ impl MetadataManager {
             self.save_all(&empty)?;
         }
 
-        let mut saved_data = self.read_entry()?;
+        let mut saved_data = self.read_all()?;
         saved_data.data.push(additional_metadata.clone());
         self.save_all(&saved_data)?;
 
@@ -49,7 +49,7 @@ impl MetadataManager {
         Ok(())
     }
 
-    pub fn read_entry(&self) -> io::Result<SavedData> {
+    pub fn read_all(&self) -> io::Result<SavedData> {
         if !Path::new(Self::METADATA_FILE).exists() {
             return Ok(SavedData { data: vec![] });
         }
@@ -63,7 +63,7 @@ impl MetadataManager {
     }
 
     pub fn key_name_already_exists(&self, name: &str) -> bool {
-        if let Ok(saved_data) = self.read_entry() {
+        if let Ok(saved_data) = self.read_all() {
             saved_data.data.iter().any(|d| d.name == name)
         } else {
             false
@@ -85,7 +85,7 @@ impl MetadataManager {
             80
         };
 
-        match self.read_entry() {
+        match self.read_all() {
             Ok(saved_data) => {
                 if saved_data.data.is_empty() {
                     println!("No encrypted keys were found in {}.", Self::METADATA_FILE);
@@ -136,7 +136,7 @@ impl MetadataManager {
     }
 
     pub fn remove_entry(&self, name: &str) -> Result<bool, QlockError> {
-        let mut saved_data = self.read_entry().map_err(QlockError::IoError)?;
+        let mut saved_data = self.read_all().map_err(QlockError::IoError)?;
         let index = saved_data
             .data
             .iter()

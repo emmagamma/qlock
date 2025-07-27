@@ -361,7 +361,7 @@ impl Decryptor {
     ) -> Result<(), QlockError> {
         println!("Decrypting file: {}", file_path.to_str().unwrap());
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
-        let saved = MetadataManager.read_entry().map_err(QlockError::IoError)?;
+        let saved = MetadataManager.read_all().map_err(QlockError::IoError)?;
 
         for datum in saved.data {
             if self.is_hash_valid(&contents, &datum)? {
