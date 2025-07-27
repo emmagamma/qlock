@@ -34,7 +34,7 @@ pub struct CryptoUtils {
 impl CryptoUtils {
     pub fn new() -> Self {
         Self {
-            argon_params: Params::new(42_699u32, 2u32, 1u32, Some(32)).unwrap(),
+            argon_params: Params::new(42_699u32, 2u32, 4u32, Some(32)).unwrap(),
         }
     }
 
