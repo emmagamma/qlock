@@ -23,7 +23,10 @@ impl FileUtils {
     pub fn filter_files_for_dec(files: &[PathBuf]) -> Vec<PathBuf> {
         files
             .iter()
-            .filter(|f| f.extension().is_some_and(|ext| ext == "qlock"))
+            .filter(|f| {
+                f.extension().is_some_and(|ext| ext == "qlock")
+                    && !f.components().any(|c| c.as_os_str() == ".qlock_metadata")
+            })
             .cloned()
             .collect()
     }
@@ -156,11 +159,7 @@ impl FileUtils {
         let mut all_files = Vec::new();
 
         for path in paths {
-            if path.is_file()
-                && !path
-                    .components()
-                    .any(|c| c.as_os_str() == ".qlock_metadata")
-            {
+            if path.is_file() {
                 all_files.push(path.to_path_buf());
             }
         }
@@ -170,12 +169,18 @@ impl FileUtils {
                 let mut dir_files: Vec<_> = WalkDir::new(path)
                     .follow_links(true)
                     .into_iter()
-                    .filter_map(|e| e.ok())
-                    .filter(|e| {
-                        let p = e.path();
-                        p.is_file() && !p.components().any(|c| c.as_os_str() == ".qlock_metadata")
+                    .filter_map(|e| {
+                        if let Ok(entry) = e {
+                            let p = entry.path();
+                            if p.is_file() {
+                                Some(p.to_path_buf())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
                     })
-                    .map(|e| e.path().to_path_buf())
                     .collect();
                 dir_files.sort();
                 all_files.extend(dir_files);
@@ -188,21 +193,9 @@ impl FileUtils {
     pub fn preview_files(folder: &Path, is_encrypt: bool) -> Result<(), QlockError> {
         let all_files = FileUtils::collect_files(&[folder.to_path_buf()])?;
         let filtered_files: Vec<_> = if is_encrypt {
-            all_files
-                .into_iter()
-                .filter(|f| {
-                    !f.components().any(|c| c.as_os_str() == ".qlock_metadata")
-                        && f.extension().is_none_or(|ext| ext != "qlock")
-                })
-                .collect()
+            FileUtils::filter_files_for_enc(&all_files)
         } else {
-            all_files
-                .into_iter()
-                .filter(|f| {
-                    !f.components().any(|c| c.as_os_str() == ".qlock_metadata")
-                        && f.extension().is_some_and(|ext| ext == "qlock")
-                })
-                .collect()
+            FileUtils::filter_files_for_dec(&all_files)
         };
 
         if filtered_files.is_empty() {
@@ -221,6 +214,7 @@ impl FileUtils {
                 "decryption"
             }
         );
+
         for (index, file) in filtered_files.iter().enumerate() {
             println!("{}. {}", index + 1, file.display());
         }
