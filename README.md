@@ -14,12 +14,23 @@ Use `qlock` to encrypt files before uploading them to cloud storage, backing up 
 
 ## 🔧 Installation
 
-### macOS – Using a Pre-compiled Binary
+### 🚀 Quickstart:
+
+```
+curl -fsSL https://raw.githubusercontent.com/emmagamma/qlock/main/install.sh | bash
+```
+
+You should now be able to run `qlock` from your terminal.
+
+---
+
+<details>
+  <summary>### 🤖 macOS – Using a Pre-compiled Binary</summary>
 
 1. Download the appropriate macOS binary for your machine:
 
-- [Download macOS Intel executable (x86_64)](https://github.com/emmagamma/qlock/releases/download/v0.5.1/qlock-darwin-x86_64.tar.gz)
-- [Download macOS Apple Silicon executable (ARM)](https://github.com/emmagamma/qlock/releases/download/v0.5.1/qlock-darwin-ARM.tar.gz)
+- [Download macOS Intel executable (x86_64)](https://github.com/emmagamma/qlock/releases/latest/download/qlock-darwin-x86_64.tar.gz)
+- [Download macOS Apple Silicon executable (ARM)](https://github.com/emmagamma/qlock/releases/latest/download/qlock-darwin-ARM.tar.gz)
 
 2. Unzip the downloaded file:
 
@@ -51,9 +62,12 @@ xattr -dr com.apple.quarantine $(which qlock)
 
 You should now be able to run `qlock` from your terminal.
 
+</details>
+
 ---
 
-### 🛠️ Linux / Windows / macOS – Building from Source
+<details>
+  <summary>### 🛠️ Linux / Windows / macOS – Building from Source</summary>
 
 > If you don’t have `git`, install it from: [https://git-scm.com/downloads](https://git-scm.com/downloads)
 
@@ -72,6 +86,8 @@ cargo build --release && cp target/release/qlock /usr/local/bin/qlock
 ```
 
 You should now be able to run `qlock` from your terminal.
+
+</details>
 
 ---
 
@@ -212,6 +228,7 @@ qlock -d <file> -f
 When you don’t provide `-o`/`--output`, output files are named and placed based on the original file paths and metadata. Here's how it works:
 
 - **Without `-o`:** Files are output next to the originals within the directory structure.
+
   - **Encryption:** The original file name is used, but the file extension is replaced with `.qlock`
   - **Decryption:** The original file name (including extension) is restored using information stored in `.qlock_metadata/`
 
@@ -252,7 +269,7 @@ Encryption flow:
 
 Stored metadata includes:
 
-- Encrypted key (the *ciphertext* of the key that was used to encrypt your files, not the key itself)
+- Encrypted key (the _ciphertext_ of the key that was used to encrypt your files, not the key itself)
 - Hash of the encrypted file contents
 - Nonces and salts
 - Input/output filenames
@@ -263,7 +280,7 @@ Stored metadata includes:
 ## 📈 Roadmap
 
 - [ ] Improve test coverage with edge cases
-- [ ] Tab auto-completion for key names
+- [x] Tab auto-completion for key names
 - [ ] Support quantum-resistant encryption algorithms
 - [ ] Allow customizing encryption/hashing parameters
 - [ ] Global metadata file in `$HOME` with path tracking
@@ -280,16 +297,19 @@ Stored metadata includes:
 **Ko-fi:** https://ko-fi.com/emmagamma/tip
 
 **BTC:**
+
 ```
 0GkTcrxwSYiU8J9LH7akzi19PKGoLyHfzB
 ```
 
 **ETH:**
+
 ```
 0xf0173f53b85488ed9d085224612e7e04c7f4ab6b
 ```
 
 **Monero:**
+
 ```
 437xv9PdTTTiAGfjgN5H73JKpYzQnnqMSd96g9ijYfCxNMYJCdNjz2RHPz8iLcF36yLJuMJ9WWCGH1oWvmtK183t3rK9H4X
 ```
