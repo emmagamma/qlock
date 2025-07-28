@@ -96,6 +96,6 @@ echo "🎉 qlock v$LATEST_VERSION installed successfully!"
 if [ "$completion_missing" = false ]; then
   echo ""
   echo "⚠️ To enable shell tab completion, please run:"
-  echo "   source \"~/${SHELL_RC##*/}\""
+  echo "   source ~/${SHELL_RC##*/}"
   echo "   or restart your terminal session."
 fi
