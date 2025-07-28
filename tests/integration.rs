@@ -28,6 +28,79 @@ mod tests {
     }
 
     #[test]
+    fn encrypt_creates_correct_metadata_files() -> Result<(), Box<dyn std::error::Error>> {
+        use argon2::{Algorithm, Argon2, Params, Version};
+        use serde_json::Value;
+        use std::fs;
+
+        let temp_dir = setup_test_directory(
+            &[("a.txt", "alpha"), ("b.txt", "bravo"), ("c.txt", "charlie")],
+            &[],
+        )?;
+
+        let encrypt_args = &[
+            "-e",
+            "a.txt",
+            "b.txt",
+            "c.txt",
+            "-p",
+            "someGivenPassword1$, someGivenPassword2$, someGivenPassword3$",
+            "-o",
+            "outa, outb, outc",
+            "-af",
+        ];
+        let encrypt_output = execute_qlock_command(&temp_dir, encrypt_args)?;
+        assert_command_success(&encrypt_output);
+
+        let metadata_dir = temp_dir.path().join(".qlock_metadata");
+        assert!(metadata_dir.exists() && metadata_dir.is_dir());
+
+        let files = [("outa", "a.txt"), ("outb", "b.txt"), ("outc", "c.txt")];
+        for (out, _orig) in files.iter() {
+            let qlock_path = temp_dir.path().join(format!("{out}.qlock"));
+            assert!(qlock_path.exists());
+
+            let qlock_bytes = fs::read(&qlock_path)?;
+
+            let mut found = false;
+            for entry in fs::read_dir(&metadata_dir)? {
+                let entry = entry?;
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                if file_name.starts_with(out) && file_name.ends_with(".json") {
+                    let parts: Vec<_> = file_name.split('.').collect();
+                    assert_eq!(parts[0], *out);
+                    let short_hash = parts[1];
+
+                    let json: Value = serde_json::from_str(&fs::read_to_string(entry.path())?)?;
+                    let hash_bytes: Vec<u8> = serde_json::from_value(json["hash"].clone())?;
+
+                    let salt_b: Vec<u8> = serde_json::from_value(json["salt_b"].clone())?;
+
+                    let params = Params::new(42_699u32, 2u32, 4u32, Some(32)).unwrap();
+                    let mut hash_out = [0u8; 32];
+                    Argon2::new(Algorithm::Argon2d, Version::V0x13, params)
+                        .hash_password_into(&qlock_bytes, &salt_b, &mut hash_out)
+                        .unwrap();
+
+                    let expected_short_hash = hash_out[..7]
+                        .iter()
+                        .map(|b| format!("{:02x}", b))
+                        .collect::<String>();
+                    assert_eq!(short_hash, expected_short_hash);
+
+                    assert_eq!(&hash_bytes[..], &hash_out[..]);
+
+                    found = true;
+                    break;
+                }
+            }
+            assert!(found, "No metadata file found for output {out}");
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn encrypt_decrypt_multiple_files() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = setup_test_directory(
             &[
