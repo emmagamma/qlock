@@ -246,7 +246,7 @@ impl FileUtils {
                 if !is_encrypt {
                     // For decryption, don't loop forever on invalid pass
                     return Err(QlockError::KeyDerivationError(
-                        "Invalid password format".to_string(),
+                        "Invalid password".to_string(),
                     ));
                 }
             }

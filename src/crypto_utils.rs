@@ -124,7 +124,7 @@ impl Encryptor {
         let filtered_files = FileUtils::filter_files_for_enc(&all_files);
 
         if filtered_files.is_empty() {
-            println!("No files found for the specified mode.");
+            eprintln!("No files found for the specified mode.");
             return Ok(());
         }
 
@@ -322,6 +322,11 @@ impl Decryptor {
         let qlock_files = FileUtils::filter_files_for_dec(&all_files);
         let total_files = qlock_files.len();
 
+        if qlock_files.is_empty() {
+            eprintln!("No files found for the specified mode.");
+            return Ok(());
+        }
+
         let passwords = CryptoUtils::parse_passwords(&passwords);
 
         for (idx, file) in qlock_files.iter().enumerate() {
@@ -357,7 +362,10 @@ impl Decryptor {
         idx: usize,
         total_files: usize,
     ) -> Result<(), QlockError> {
-        println!("Decrypting file: {}", file_path.to_str().unwrap());
+        println!(
+            "Locating metadata for file: {}",
+            file_path.to_str().unwrap()
+        );
         let contents = fs::read(file_path).map_err(QlockError::IoError)?;
         let saved = MetadataManager.read_all().map_err(QlockError::IoError)?;
 
@@ -398,6 +406,7 @@ impl Decryptor {
         contents: &[u8],
         datum: &Metadata,
     ) -> Result<Vec<u8>, QlockError> {
+        println!("Deriving key from password...");
         let derived_key = self
             .crypto_utils
             .derive_key(password.as_bytes(), &datum.salt_a)?;
@@ -405,6 +414,7 @@ impl Decryptor {
         let cipher_b = XChaCha20Poly1305::new((&derived_key).into());
         let nonce_b = XNonce::from_slice(&datum.nonce_b);
 
+        println!("Decrypting file key...");
         let decrypted_key = cipher_b
             .decrypt(nonce_b, &*datum.key)
             .map_err(|e| QlockError::DecryptionError(e.to_string()))?;
@@ -412,6 +422,7 @@ impl Decryptor {
         let cipher_a = XChaCha20Poly1305::new((&*decrypted_key).into());
         let nonce_a = XNonce::from_slice(&datum.nonce_a);
 
+        println!("Decrypting file contents...");
         cipher_a
             .decrypt(nonce_a, contents)
             .map_err(|e| QlockError::DecryptionError(e.to_string()))
